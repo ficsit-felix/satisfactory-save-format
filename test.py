@@ -46,7 +46,12 @@ def readLengthPrefixedString():
     chars = f.read(length-1)
     zero = f.read(1)
     bytesRead += length
-    assert zero == b'\x00'
+    if zero != b'\x00':
+        if length > 100:
+            print('zero is ' + str(zero) + ' in ' + str(chars[0:100]))
+        else:
+            print('zero is ' + str(zero) + ' in ' + str(chars))
+        assert False
     return chars.decode('ascii')
 
 
@@ -144,7 +149,7 @@ print(entryCount)
 
 print('///// END OF HEADER /////')
 
-input()
+# input()
 def nprint(x):
     pass
 
@@ -244,6 +249,10 @@ def readNull():
 
 def readProperty():
     name = readLengthPrefixedString()
+    if name == 'None':
+        print('- [None]')
+        return
+
     prop = readLengthPrefixedString()
 
     print('- ' + prop + ' ' + name)
@@ -255,38 +264,81 @@ def readProperty():
         print(readLengthPrefixedString())
     elif prop == 'StructProperty':
         readHex(8)
-        print(readLengthPrefixedString()) #  Vector
-        readHex(29) # TODO ...?
+        type = readLengthPrefixedString()
+        print('structType: ' + type)
+        if type == 'Vector' or type == 'Rotator':
+            readHex(29) # TODO ...?
+        elif type == 'Box':
+            readHex(42)
+        elif type == 'RemovedInstanceArray' or type == 'InventoryStack':
+            readHex(17) # TODO ...?
+            while (readProperty()):
+                pass
+        elif type == 'InventoryItem':
+            readHex(17)
+            print(readLengthPrefixedString())
+            print(readLengthPrefixedString())
+            print(readLengthPrefixedString())
+            print(readLengthPrefixedString())
+            # while readProperty():
+            #   pass
+            readProperty()
+            # can't consume null here because it might be needed by the overarching struct
+            print('->>')
+        else:
+            print('Unknown type: ' + type)
+            readHex(32)
+            input()
+            assert False
+        
     elif prop == 'ArrayProperty':
         print(readInt()) # 964 length of the array property?
         print(readInt()) # 0
         itemType = readLengthPrefixedString()
         print('itemType: ' + itemType)
-
+        readHex(1)
+        count = readInt()
+        print('count: ' + str(count))
         if itemType == 'ObjectProperty':
-            readHex(1)
-            count = readInt()
-            print('count: ' + str(count))
             for j in range(0, count):
                 print(readLengthPrefixedString())
                 print(readLengthPrefixedString())
         elif itemType == 'StructProperty':
-            readHex(1)
-            count = readInt()
-            print('count: ' + str(count))
             print(readLengthPrefixedString())
             print(readLengthPrefixedString())
             readHex(8)
-            print(readLengthPrefixedString()) #  MessageData
+            
+            type = readLengthPrefixedString() #  MessageData
+            print(type)
+
             readHex(17)
+            # input()
+            for i in range(0, count):
+                while (readProperty()):
+                    pass
+            '''
+            if type == 'MessageData':
+                readHex(17)
 
-            readProperty() # BooleanProperty WasRead
-            readProperty() # ObjectProperty MessageClass
-            print(readLengthPrefixedString()) # None
-            readProperty()
-            readProperty()
-            print(readLengthPrefixedString()) # None
-
+                readProperty() # BooleanProperty WasRead
+                readProperty() # ObjectProperty MessageClass
+                print(readLengthPrefixedString()) # None
+                readProperty()
+                readProperty()
+                print(readLengthPrefixedString()) # None
+            else:
+                readHex(17)
+                readProperty() # StructProperty SpawnLocation
+                readProperty() # ObjectProperty Creature
+                readProperty() # BoolProperty WasKilled
+                readProperty() # IntProperty KilledOnDayNr
+                readProperty()
+                readHex(32)
+                input()
+            '''
+        elif  itemType == 'IntProperty':
+            for i in range(0, count):
+                print(readInt())
         else:
             print('unknown itemType ' + itemType)
             readHex(32)
@@ -329,15 +381,16 @@ def readEntity(length):
     print('entity: '+ entityName)
 
     childCount = readInt() # TODO maybe child count? seems to 
-
-    print('children: [')
-    for i in range(0, childCount):
-        print('    ' + readLengthPrefixedString())
-        print('    ' + readLengthPrefixedString())
-    print(']')
+    if childCount > 0:
+        print('children('+str(childCount)+'): [')
+        for i in range(0, childCount):
+            print('    ' + readLengthPrefixedString())
+            print('    ' + readLengthPrefixedString())
+        print(']')
     
     # print('..'+ str(bytesRead))
     while (readProperty()):
+        print('------')
         pass
     missing = length - bytesRead
     if missing > 0:
@@ -352,558 +405,35 @@ def readEntity(length):
         
 
 
-for i in range(0,500):
-    type = readInt()  # TODO: might actually be length of the following entry?
-    print('type: ' + str(type))
-    if type == 25:
-        readEntity(type)
-    elif type == 91:
-        readEntity(type)
-    elif type == 96:
-        readEntity(type)
-    elif type == 92:
-        readEntity(type)
+for i in range(0,elementCount):
+    length = readInt()  # TODO: might actually be length of the following entry?
+    print('length: ' + str(length))
 
-    elif type == 1286:
-        readEntity(type)
-        '''
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # mAvailableRecipes
-        print(readLengthPrefixedString()) # ArrayProperty
-        print(readInt()) # 1126 length of the array property?
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(1)
-        count = readInt()
-        print(count)
-        for j in range(0, count):
-            readHex(4)
-            print(readLengthPrefixedString()) # /Game/FactoryGame/Recipes/Smelter/Recipe_IngotIron.Recipe_IngotIron_C
-        
-        print(readLengthPrefixedString()) # None
-        print(readInt()) # 0
-        '''
-    elif type == 2640:
-        readEntity(type)
-        '''
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # mAvailableSchematics
-        print(readLengthPrefixedString()) # ArrayProperty
-        print(readInt()) # 2419 length of the array property?
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(1)
-        count = readInt()
-        print(count)
-        for j in range(0, count):
-            readHex(4)
-            print(readLengthPrefixedString()) # /Game/FactoryGame/Recipes/Smelter/Recipe_IngotIron.Recipe_IngotIron_C
-
-        print(readLengthPrefixedString()) # mShipLandTimeStampSave
-        print(readLengthPrefixedString()) # FloatProperty
-        readHex(9)
-        print(readInt())
-        print(readLengthPrefixedString()) # None
-        print(readLengthPrefixedString()) # [empty]
-        '''
-    elif type == 192:
-        readEntity(type)
-        '''
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # mDaySeconds
-        print(readLengthPrefixedString()) # FloatProperty
-        readHex(9)
-        print(readInt())
-        print(readLengthPrefixedString()) # mNumberOfPassedDays
-        print(readLengthPrefixedString()) # IntProperty
-        readHex(9)
-        print(readInt())
-        print(readLengthPrefixedString()) # None
-        print(readLengthPrefixedString()) # [empty]
-        '''
-    elif type == 264:
-        readEntity(type)
-        '''
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # mPendingTutorial
-        print(readLengthPrefixedString()) # EnumProperty
-        print(readInt()) # 43
-        readHex(4)
-        print(readLengthPrefixedString()) # EIntroTutorialSteps
-        readHex(1)
-        print(readLengthPrefixedString()) # EIntroTutorialSteps::ITS_DISMANTLE_POD
-        print(readLengthPrefixedString()) # mHasCompletedIntroSequence
-        print(readLengthPrefixedString()) # BoolProperty
-        readHex(10)
-        print(readLengthPrefixedString()) # None
-        print(readLengthPrefixedString()) # [empty]
-        '''
-    elif type == 154:
-        readEntity(type)
-        '''
-        print(readLengthPrefixedString()) # [empty]
-        print(readLengthPrefixedString()) # [empty]
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # mPendingTutorial
-        print(readLengthPrefixedString()) # StrProperty
-        readHex(9)
-        print(readLengthPrefixedString()) # empty
-        print(readLengthPrefixedString()) # mStartingPointTagName
-        print(readLengthPrefixedString()) # NameProperty
-        readHex(9)
-        print(readLengthPrefixedString()) # Grass Fields
-        print(readLengthPrefixedString()) # None
-        print(readLengthPrefixedString()) # [empty]
-        readHex(4)
-        '''
-    elif type == 2006:
-        readEntity(type)
-        '''
-        print(readLengthPrefixedString()) # [empty]
-        print(readLengthPrefixedString()) # [empty]
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # mTimeSubsystem
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.TimeSubsystem
-        print(readLengthPrefixedString()) # mStorySubsystem
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.StorySubsystem
-        print(readLengthPrefixedString()) # mRailroadSubsystem
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.RailroadSubsystem
-        print(readLengthPrefixedString()) # mCircuitSubsystem
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.CircuitSubsystem
-        print(readLengthPrefixedString()) # mRecipeManager
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.recipeManager
-        print(readLengthPrefixedString()) # mSchematicManager
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.schematicManager
-        print(readLengthPrefixedString()) # mGamePhaseManager
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.GamePhaseManager
-        print(readLengthPrefixedString()) # mResearchManager
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.ResearchManager
-        print(readLengthPrefixedString()) # mTutorialIntroManager
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.TutorialIntroManager
-        print(readLengthPrefixedString()) # mActorRepresentationManager
-        print(readLengthPrefixedString()) # ObjectProperty 
-        readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.ActorRepresentationManager
-        print(readLengthPrefixedString()) # mScannableResources
-        print(readLengthPrefixedString()) # ArrayProperty 
-        print(readInt()) # 88 length of the array property?
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(1)
-        count = readInt()
-        print(count)
-        for j in range(0, count):
-            readHex(4)
-            print(readLengthPrefixedString())
-
-        print(readLengthPrefixedString()) # mVisitedMapAreas
-        print(readLengthPrefixedString()) # ArrayProperty 
-        print(readInt()) # 113 length of the array property?
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(1)
-        count = readInt()
-        print(count)
-        for j in range(0, count):
-            readHex(4)
-            print(readLengthPrefixedString())
-
-
-
-
-        readProperty() # mPlayDurationWhenLoaded
-        readProperty() # mReplicatedSessionName
-        readProperty() # mFirstPawnLocation
-        readProperty() # mFirstPawnRotation
-        
-        readProperty() # None
-        # readHex(4)
-        #print(readLengthPrefixedString()) 
-        #print(readLengthPrefixedString()) # [empty]
-        '''
-    elif type == 2222:
-        readEntity(type)
-    elif type == 285:
-        readEntity(type)
-    elif type == 1089 \
-        or type == 396 \
-        or type == 397 \
-        or type == 379 \
-        or type == 377 \
-        or type == 381 \
-        or type == 376:
-        readEntity(type)
-    elif type == 1:
-        print(readLengthPrefixedString()) # Persistent_Level
-        print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.BP_PlayerState_C_0
-        print(readInt()) # 0
-        print(readLengthPrefixedString()) # [empty]
-        print(readLengthPrefixedString()) # [empty]
-        readHex(4)
-        readProperty() # mHotbarShortcuts
-        readProperty() # mOwnedPawn
-        readProperty() # mHasReceivedInitialItems
-        readProperty() # mHasSetupDefaultShortcuts
-        readProperty() # mTutorialSubsystem
-        readProperty() # mMessageData
-        readProperty() # mRememberedFirstTimeEquipmentClasses
-        readProperty() # None
-
-        readHex(34) # TODO ?????
-        readProperty() # mBuildableSubsystem
-        readProperty() # mFoundationSubsystem
-        readProperty() # None
-
-
-        readHex(32)
-        input()
-    else:
-        print('unknown type ' + str(type))
-
-        readHex(32)
-        input()
-        assert False
-
-    if type != 25:
-        print('>>>>>> bytesRead: ' + str(bytesRead) + '/' + str(type))
-        # input()
-readHex(32)
-input()
-
-#for i in range(0,577): # range(0, 577):
-    #readPlayerState()
-    #print(i)
 #
-#input()
+        #print(readLengthPrefixedString())
+        #print(readLengthPrefixedString())
+        #readInt()
+        #readProperty()
+        #readProperty()
+        #readProperty()
+    print(': ' + str(i))
+    if i < 10203:
 
-readPersistentLevelNone12()
+        readEntity(length)
+    else:
+        bytesRead = 0
 
-readPersistentLevelNone12()
-
-print(readInt())
-print(readString(f)) # None
-print(f.read(16))
-print(readString(f)) # Persistent_Level
-print(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.FGWorldSettings
-print(f.read(4))
-print('---')
-
-readPersistentLevelNone12()
-readPersistentLevelNone12()
-
-print(readInt())
-print(readString(f)) # None
-print(f.read(16))
-print(readString(f)) # Persistent_Level
-nprint(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-nprint(f.read(8))
-print(readString(f)) # mAvailableRecipes
-nprint(f.read(4))
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # ObjectProperty
-print(f.read(1))
-object_count = int.from_bytes(f.read(1), byteorder='big')
-print(f.read(3))
-
-def readRecipe():
-    print(f.read(8))
-    print(readString(f)) # /Game/FactoryGame/Recipes/Smelter/Recipe_IngotIron.Recipe_IngotIron_C
-    
-
-for i in range(0, object_count):
-    readRecipe()
-    print(i)
-
-
-print('###')
-readPersistentLevelNone12()
-
-print(f.read(4))
-## TODO merge with function above
-print(readString(f)) # None
-print(readLevelName())
-print(f.read(12))
-print(readString(f)) # Persistent_Level
-nprint(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-nprint(f.read(8))
-
-print(readString(f)) # mAvailableSchematics
-nprint(f.read(4))
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # ObjectProperty
-print(f.read(1))
-object_count = int.from_bytes(f.read(1), byteorder='big')
-print(f.read(3))
-
-for i in range(0,object_count):
-    readRecipe()
-
-
-
-print(f.read(4))
-print(readString(f)) # mShipLandTimeStampSave
-print(f.read(4))
-print(readString(f)) # FloatProperty
-print(f.read(17))
-print(readString(f)) # None
-print(f.read(12))
-print(readString(f)) # Persistent_Level
-print(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-print(f.read(8))
-
-print(readString(f)) # None
-print(f.read(12))
-print(readString(f)) # Persistent_Level
-print(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-
-print(f.read(8))
-print(readString(f)) # mDaySeconds
-print(f.read(4))
-print(readString(f)) # FloatProperty
-print(f.read(17))
-print(readString(f)) # mNumberOfPassedDays
-print(f.read(4))
-print(readString(f)) # IntProperty
-print(f.read(17))
-print(readString(f)) # None
-print(f.read(12))
-print(readString(f)) # Persistent_Level
-print(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.BP_GameState_C_0
-
-print(f.read(8))
-print(readString(f)) # mPendingTutorial
-print(f.read(4))
-print(readString(f)) # EnumProperty
-print(f.read(12))
-print(readString(f)) # EIntroTutorialSteps
-print(f.read(5))
-print(readString(f)) # EIntroTutorialSteps::ITS_DISMANTLE_POD
-print(f.read(4))
-print(readString(f)) # mHasCompletedIntroSequence
-print(f.read(4))
-print(readString(f)) # BoolProperty
-print(f.read(14))
-
-print(readString(f)) # None
-print(f.read(24))
-print(readString(f)) # mSaveSessionName
-print(f.read(4))
-print(readString(f)) # StrProperty
-print(f.read(13))
-print(readString(f)) # empty
-print(f.read(4))
-print(readString(f)) # mStartingPointTagName
-print(f.read(4))
-print(readString(f)) # NameProperty
-print(f.read(13))
-print(readString(f)) # Grass Fields
-print(f.read(4))
-print(readString(f)) # None
-print(f.read(28))
-
-def readSubsystem():
-    print(readString(f)) # mTimeSubsystem
-    print(f.read(4))
-    print(readString(f)) # ObjectProperty
-    print(f.read(9))
-    readLevelName()
-    readObjectName()
-    print(f.read(4))
-    print('---')
-
-for i in range(0, 10):
-    readSubsystem()
-
-print(readString(f)) # mTimeSubsystem
-print(f.read(4))
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # ObjectProperty
-print(f.read(13))
-print(readString(f)) # /Game/FactoryGame/Resource/RawResources/OreIron/Desc_OreIron.Desc_OreIron_C
-print(f.read(4))
-
-print(readString(f)) # mVisitedMapAreas
-print(f.read(4))
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # ObjectProperty
-print(f.read(13))
-print(readString(f)) # /Game/FactoryGame/Interface/UI/Minimap/MapAreaPersistenLevel/Area_GrassFields_3.Area_GrassFields_3_C
-print(f.read(4))
-
-print(readString(f)) # mPlayDurationWhenLoaded
-print(f.read(4))
-print(readString(f)) # IntProperty
-print(f.read(17))
-
-print(readString(f)) # mReplicatedSessionName
-print(f.read(4))
-print(readString(f)) # StrProperty
-print(f.read(13))
-print(readString(f)) # empty
-print(f.read(5))
-
-print(readString(f)) # FirstPawnLocation
-print(f.read(4))
-print(readString(f)) # StructProperty
-print(f.read(12))
-print(readString(f)) # Vector
-print(f.read(33))
-
-print(readString(f)) # FirstPawnLocation
-print(f.read(4))
-print(readString(f)) # StructProperty
-print(f.read(12))
-print(readString(f)) # Rotator
-print(f.read(33))
-
-print(readString(f)) # None
-print(f.read(12))
-print(readString(f)) # Persistent_Level
-print(f.read(4))
-print(readString(f)) # Persistent_Level:PersistentLevel.BP_PlayerState_C_0
-print(f.read(16))
-
-print('>>>')
-print(f.read(4))
-print(readString(f)) # mHotbarShortcuts
-print(f.read(4))
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # ObjectProperty
-print(f.read(5))
-
-def readShortcut():
-    readLevelName()
-    readObjectName()
-    
-    print("--")
-
-for i in range(0,10):
-    readShortcut()
-
-
-print(readInt())
-print(readString(f)) # mOwnedPawn
-print(readInt())
-print(readString(f)) # ObjectProperty
-print(f.read(9))
-readLevelName()
-readObjectName()
-
-print(readInt())
-print(readString(f)) # mOwnedPawn
-print(readInt())
-print(readString(f)) # BoolProperty
-print(f.read(10))
-
-print(readInt())
-print(readString(f)) # mHasSetupDefaultShortcuts
-print(readInt())
-print(readString(f)) # BoolProperty
-print(f.read(10))
-
-print(readInt())
-print(readString(f)) # mTutorialSubsystem
-print(readInt())
-print(readString(f)) # ObjectProperty
-print(f.read(9))
-readLevelName()
-readObjectName()
-
-print('-----')
-print(readInt())
-print(readString(f)) # mMessageData
-print(readInt())
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # StructProperty
-print(f.read(9))
-print(readString(f)) # mMessageData
-print(readInt())
-print(readString(f)) # StructProperty
-print(f.read(12))
-print(readString(f)) # mMessageData
-print(f.read(17))
-
-def readMessage():
-    print(readInt())
-    print(readString(f)) # WasRead
-    print(readInt())
-    print(readString(f)) # BoolProperty
-    print(f.read(10))
-    print(readInt())
-    print(readString(f)) # MessageClass
-    print(readInt())
-    print(readString(f)) # ObjectProperty
-    print(f.read(17))
-    print(readString(f)) # /Game/FactoryGame/Interface/UI/Message/Tutorial/IntroTutorial/IntroTutorial_Greeting.IntroTutorial_Greeting_C
-    print(readInt())
-    print(readString(f)) # None
-
-for i in range(0,2):
-    readMessage()
-
-
-print('-----')
-print(readInt())
-print(readString(f)) # mMessageData
-print(readInt())
-print(readString(f)) # ArrayProperty
-print(f.read(12))
-print(readString(f)) # ObjectProperty
-print(f.read(13))
-print(readString(f)) # /Game/FactoryGame/Equipment/ResourceScanner/BP_ResourceScanner.BP_ResourceScanner_C
-print(readInt())
-print(readString(f)) # None
-print(f.read(38))
-
-print('')
-print('........')
-print(f.read(32))
-print('')
+        while readProperty():
+            pass
+        missing = length - bytesRead
+        print ('miss' + str(missing))
+        if missing > 0:
+            print('$ got missing ('+str(missing)+'):')
+            readHex(missing)
+        if missing < 0:
+            print('negative missing amount: ' + str(missing))
+            readHex(32)
+            input()
+            assert False
+        
+print('finished')
