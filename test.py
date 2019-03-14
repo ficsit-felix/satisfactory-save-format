@@ -30,6 +30,7 @@ bytesRead = 0
 
 def assertFail(message):
     print('failed: ' +message)
+    readHex(32)
     input()
     assert False
 
@@ -93,7 +94,7 @@ def assertNullByte():
     bytesRead += 1
     zero = f.read(1)
     if zero !=  b'\x00':
-        assertFail('not null but ' + zero)
+        assertFail('not null but ' + str(zero))
 
 def readHex(count):
     global bytesRead
@@ -247,8 +248,7 @@ def readActor(nr):
             'scale3d': [sx, sy, sz],
 
         },
-        'wasPlacedInLevel': wasPlacedInLevel,
-        'properties': []
+        'wasPlacedInLevel': wasPlacedInLevel
     }
 
 def readObject(nr):
@@ -262,8 +262,7 @@ def readObject(nr):
         'className': className,
         'levelName': levelName,
         'pathName': pathName,
-        'outerPathName': outerPathName,
-        'properties': []
+        'outerPathName': outerPathName
     }
 
 
@@ -293,53 +292,125 @@ def readNull():
     readHex(4)
 
 
-def readProperty():
+def readProperty(properties):
     name = readLengthPrefixedString()
     if name == 'None':
         print('- [None]')
         return
 
     prop = readLengthPrefixedString()
-  
-    print('- ' + prop + ' ' + name)
+    length = readInt()
+    zero = readInt()
+    print('- ' + prop + ' ' + name + '(' + str(length)+')')
+    if zero != 0:
+        assertFail('not null: ' + str(zero))
+
+    property = {
+        'name': name,
+        'type': prop
+    }
+
     if prop == 'IntProperty':
-        readHex(9)
-        print(readInt())
+        assertNullByte()
+        property['value'] = readInt()
     elif prop == 'StrProperty':
-        readHex(9)
-        print(readLengthPrefixedString())
-        input()
+        assertNullByte()
+        property['value'] = readLengthPrefixedString()
     elif prop == 'StructProperty':
-        readHex(8)
         type = readLengthPrefixedString()
         print('structType: ' + type)
+
+        property['structUnknown'] = readHex(17) # TODO
+
         if type == 'Vector' or type == 'Rotator':
-            readHex(29)  # TODO ...?
+            x = readFloat()
+            y = readFloat()
+            z = readFloat()
+            print(x)
+            print(y)
+            print(z)
+            property['value'] = {
+                'type': type,
+                'x': x,
+                'y': y,
+                'z': z
+            }
+            
         elif type == 'Box':
-            readHex(42)
+            minX = readFloat()
+            minY = readFloat()
+            minZ = readFloat()
+            maxX = readFloat()
+            maxY = readFloat()
+            maxZ = readFloat()
+            isValid = readByte()
+            property['value'] = {
+                'type': type,
+                'min': [minX, minY, minZ],
+                'max': [maxX, maxY, maxZ],
+                'isValid': isValid
+            }
         elif type == 'LinearColor':
-            readHex(33)
+            r = readFloat()
+            g = readFloat()
+            b = readFloat()
+            a = readFloat()
+            property['value'] = {
+                'type': type,
+                'r': r,
+                'g': g,
+                'b': b,
+                'a': a
+            }
         elif type == 'Transform':
-            readHex(17)
-            while (readProperty()):
+            props = []
+            while (readProperty(props)):
                 pass
+            property['value'] = {
+                'type': type,
+                'properties' : props
+            }
+
         elif type == 'Quat':
-            readHex(33)
+            a = readFloat()
+            b = readFloat()
+            c = readFloat()
+            d = readFloat()
+            property['value'] = {
+                'type': type,
+                'a': a,
+                'b': b,
+                'c': c,
+                'd': d
+            }
+
         elif type == 'RemovedInstanceArray' or type == 'InventoryStack':
-            readHex(17)  # TODO ...?
-            while (readProperty()):
+            props = []
+            while (readProperty(props)):
                 pass
+            property['value'] = {
+                'type': type,
+                'properties': props
+            }
         elif type == 'InventoryItem':
-            readHex(17)
-            print(readLengthPrefixedString())
-            print(readLengthPrefixedString())
-            print(readLengthPrefixedString())
-            print(readLengthPrefixedString())
+            unk1 = readLengthPrefixedString() # TODO
+            itemName = readLengthPrefixedString()
+            unk2 = readLengthPrefixedString() # TODO
+            unk3 = readLengthPrefixedString() # TODO
             # while readProperty():
             #   pass
-            readProperty()
+            props = []
+            readProperty(props)
             # can't consume null here because it might be needed by the overarching struct
-            print('->>')
+
+            property['value'] = {
+                'type': type,
+                'unk1': unk1,
+                'itemName': itemName,
+                'unk2': unk2,
+                'unk3': unk3,
+                'properties': props
+            }
         else:
             print('Unknown type: ' + type)
             readHex(32)
@@ -347,116 +418,114 @@ def readProperty():
             assert False
 
     elif prop == 'ArrayProperty':
-        print(readInt())  # 964 length of the array property?
-        print(readInt())  # 0
         itemType = readLengthPrefixedString()
         print('itemType: ' + itemType)
-        readHex(1)
+        assertNullByte()
         count = readInt()
         print('count: ' + str(count))
+        values = []
+
         if itemType == 'ObjectProperty':
             for j in range(0, count):
-                print(readLengthPrefixedString())
-                print(readLengthPrefixedString())
+                values.append({
+                    'levelName': readLengthPrefixedString(),
+                    'pathName': readLengthPrefixedString()
+                })
         elif itemType == 'StructProperty':
-            print(readLengthPrefixedString())
-            print(readLengthPrefixedString())
-            readHex(8)
-
+            structName = readLengthPrefixedString()
+            structType = readLengthPrefixedString()
+            structSize = readInt()
+            zero = readInt()
+            if zero != 0:
+                assertFail('not zero: ' + str(zero))
+            print(structName + ' ' + structType + ' '+ str(structSize))
             type = readLengthPrefixedString()  # MessageData
             print(type)
 
-            readHex(17)
-            # input()
-            for i in range(0, count):
-                while (readProperty()):
-                    pass
-            '''
-            if type == 'MessageData':
-                readHex(17)
+            property['structName'] = structName
+            property['structType'] = structType
+            property['structInnerType'] = type
 
-                readProperty() # BooleanProperty WasRead
-                readProperty() # ObjectProperty MessageClass
-                print(readLengthPrefixedString()) # None
-                readProperty()
-                readProperty()
-                print(readLengthPrefixedString()) # None
-            else:
-                readHex(17)
-                readProperty() # StructProperty SpawnLocation
-                readProperty() # ObjectProperty Creature
-                readProperty() # BoolProperty WasKilled
-                readProperty() # IntProperty KilledOnDayNr
-                readProperty()
-                readHex(32)
-                input()
-            '''
+            property['structUnknown'] = readHex(17) # TODO what are those?
+
+            for i in range(0, count):
+                props = []
+                while (readProperty(props)):
+                    pass
+                values.append({
+                    'properties': props
+                })
+                
         elif itemType == 'IntProperty':
             for i in range(0, count):
-                print(readInt())
+                values.append(readInt())
         else:
             print('unknown itemType ' + itemType)
             readHex(32)
             input()
             assert False
-    elif prop == 'ObjectProperty':
-        readHex(9)
-        print(readLengthPrefixedString())  # Persistent_Level
-        print(readLengthPrefixedString())
-    elif prop == 'BoolProperty':
-        readHex(8)
-        print(readByte())
-        readHex(1)
-        input()
-    elif prop == 'FloatProperty':
-        readHex(9)
-        print(readFloat())
-    elif prop == 'EnumProperty':
-        print(readInt())  # 43
-        readHex(4)
-        print(readLengthPrefixedString())  # EIntroTutorialSteps
-        readHex(1)
-        # EIntroTutorialSteps::ITS_DISMANTLE_POD
-        print(readLengthPrefixedString())
-    elif prop == 'NameProperty':
-        readHex(9)
-        print(readLengthPrefixedString())
-    elif prop == '':
-        return False  # End of this Entity
-    elif prop == 'MapProperty':
-        readHex(8)
-        print(readLengthPrefixedString())  # IntProperty
-        print(readLengthPrefixedString())  # StructProperty
-        readHex(5)
 
+        property['values'] = values
+    elif prop == 'ObjectProperty':
+        assertNullByte()
+        property['value'] = {
+            'levelName': readLengthPrefixedString(),
+            'pathName': readLengthPrefixedString()
+        }
+    elif prop == 'BoolProperty':
+        property['value'] = readByte()
+        assertNullByte()
+    elif prop == 'FloatProperty':
+        assertNullByte()
+        property['value'] = readFloat()
+    elif prop == 'EnumProperty':
+        enumName = readLengthPrefixedString() 
+        assertNullByte()
+        valueName = readLengthPrefixedString()
+        property['value'] = {
+            'enum': enumName,
+            'value': valueName,
+        }
+    elif prop == 'NameProperty':
+        assertNullByte()
+        property['value'] = readLengthPrefixedString()
+    elif prop == 'MapProperty':
+        name = readLengthPrefixedString()
+        valueType = readLengthPrefixedString()
+        for i in range(0, 5):
+            assertNullByte()
         count = readInt()
         print('count: ' + str(count))
+        values = {
+        }
         for i in range(0, count):
-            readInt()
-            readProperty()
-            readProperty()
+            key = readInt()
+            props = []
+            while readProperty(props):
+                pass
+            values[key] = props
 
-        '''
-        print(readLengthPrefixedString()) # Buildables
-        print(readLengthPrefixedString()) # ArrayProperty
-        readHex(8)
-        print(readLengthPrefixedString()) # ObjectProperty
-        readHex(1)
-        count = readInt()
-        for i in range(0,count):
-            print(readLengthPrefixedString()) # Persistent_Level
-            print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.Build_Foundation_8x2_01_C_0
-        '''
+        property['value'] = {
+            'name': name,
+            'type': valueType,
+            'values': values
+        }
+    elif prop == 'ByteProperty':# TODO
 
-    elif prop == 'ByteProperty':
-        readHex(8)
-        unk1 = readLengthPrefixedString()  # EGamePhase
+        unk1 = readLengthPrefixedString()  # TODO
         print(unk1)
         if unk1 == 'EGamePhase':
-            readHex(1)
-            print(readLengthPrefixedString())  # EGP_MidGame
+            assertNullByte()
+            unk2 = readLengthPrefixedString()  # TODO
+            property['value'] = {
+                'unk1': unk1,
+                'unk2': unk2
+            }
         elif unk1 == 'None':
-            readHex(2)
+            property['value'] = {
+                'unk1': unk1,
+                'unk2': readHex(2)
+            }
         else:
             print('unknown byte property ' + unk1)
             readHex(32)
@@ -465,47 +534,59 @@ def readProperty():
             input()
 
     elif prop == 'TextProperty':
-        readHex(22)
-        print(readLengthPrefixedString())
-
+        property['textUnknown'] = readHex(14) # TODO
+        property['value'] = readLengthPrefixedString()
     else:
         print('Unknown property type: ' + prop)
         readHex(32)
         input()
         assert False
 
+    properties.append(property)
     return True
 
-def readEntity(length):
+def readEntity(withNames, length):
     global bytesRead
     bytesRead = 0
-    mapName = readLengthPrefixedString()
-    entityName = readLengthPrefixedString()
-    print('map: ' + mapName)
-    print('entity: ' + entityName)
 
-    childCount = readInt()  # TODO maybe child count? seems to
-    if childCount > 0:
-        print('children('+str(childCount)+'): [')
-        for i in range(0, childCount):
-            print('    ' + readLengthPrefixedString())
-            print('    ' + readLengthPrefixedString())
-        print(']')
+    entity = {}
+
+    if withNames:
+
+        entity['levelName'] = readLengthPrefixedString()
+        entity['pathName'] = readLengthPrefixedString()
+        entity['children'] = []
+
+        childCount = readInt()  # TODO maybe child count? seems to
+        if childCount > 0:
+#            print('children('+str(childCount)+'): [')
+            for i in range(0, childCount):
+                levelName = readLengthPrefixedString()
+                pathName = readLengthPrefixedString()
+                entity['children'].append({
+                    'levelName': levelName,
+                    'pathName': pathName
+                })
+                #print('    ' + readLengthPrefixedString())
+                #print('    ' + readLengthPrefixedString())
+#            print(']')
 
     # print('..'+ str(bytesRead))
-    while (readProperty()):
+    entity['properties'] = []
+    while (readProperty(entity['properties'])):
         print('------')
         pass
     missing = length - bytesRead
     if missing > 0:
         print('$ got missing ('+str(missing)+'):')
-        readHex(missing)
-        return
-    if missing < 0:
-        print('negative missing amount: ' + str(missing))
-        readHex(32)
-        input()
-        assert False
+        entity['missing'] = readHex(missing)
+    elif missing < 0:
+        assertFail('negative missing amount: ' + str(missing))
+        
+
+    return entity
+
+
 
 
 for i in range(0, elementCount):
@@ -521,26 +602,15 @@ for i in range(0, elementCount):
     # readProperty()
     print(': ' + str(i))
     # sys.stdout = open('output/'+str(i)+'.txt', 'a')
-    if i < 10203:
-        readEntity(length)
+    if i < elementCount - type0Count:
+        saveJson['objects'][i]['entity'] = readEntity(True, length)
     else:
-        bytesRead = 0
-
-        while readProperty():
-            pass
-        missing = length - bytesRead
-        print('miss' + str(missing))
-        if missing > 0:
-            print('$ got missing ('+str(missing)+'):')
-            readHex(missing)
-        if missing < 0:
-            print('negative missing amount: ' + str(missing))
-            readHex(32)
-            input()
-            assert False
+        saveJson['objects'][i]['entity'] = readEntity(False, length)
     # sys.stdout = sys.__stdout__
 
 print('finished')
 
-print(json.dumps(saveJson, indent=4))
-input()
+output = open('output.json', 'w')
+output.write(json.dumps(saveJson, indent=4))
+output.close()
+print('done')
