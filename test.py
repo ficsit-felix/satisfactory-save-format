@@ -6,12 +6,14 @@ import functools
 import itertools
 import csv
 import binascii
+import sys
+import json
 
 def readcstr(f):
     toeof = iter(functools.partial(f.read, 1), '')
     return ''.join(itertools.takewhile(b'0'.__ne__, toeof))
 
-f = open("test.sav", "rb")
+f = open("big.sav", "rb")
 
 
 
@@ -72,6 +74,10 @@ def readLong():
     bytesRead += 8
     return struct.unpack('l', f.read(8))[0]
     
+def readByte():
+    global bytesRead
+    bytesRead += 1
+    return struct.unpack('b', f.read(1))[0]
 
 def readHex(count):
     global bytesRead
@@ -132,24 +138,45 @@ def readHex(count):
               - LF_ONEMETHOD [name = `__vecDelDtor`]
                 type = 0xEDCDB, vftable offset = -1, attrs = public compiler-generated
 '''
-print(readInt()) # Save Version
-print(readInt()) # BuildVersion
-print(readInt()) # SaveName (???)
+print('START OF HEADERq')
+saveHeaderType = readInt()
+saveVersion = readInt() # Save Version
+buildVersion = readInt() # BuildVersion
 
-print(readLengthPrefixedString()) # MapName
-print(readLengthPrefixedString()) # MapOptions
-print(readLengthPrefixedString()) # SessionName
-print(readInt()) # PlayDurationSeconds
-readHex(8) # SaveDateTime
+mapName = readLengthPrefixedString() # MapName
+mapOptions = readLengthPrefixedString() # MapOptions
+sessionName = readLengthPrefixedString() # SessionName
+playDurationSeconds = readInt() # PlayDurationSeconds
+
+saveDateTime = readLong() # SaveDateTime
+saveDateSeconds = saveDateTime / 10000000
+# see https://stackoverflow.com/a/1628018
+print(saveDateSeconds-62135596800)
+
 # print(readLong())
-readHex(1) # SessionVisibility
+sessionVisibility = readByte() # SessionVisibility
 
 entryCount = readInt() #  total entries
-print(entryCount)
+saveJson = {
+    'saveHeaderType': saveHeaderType,
+    'saveVersion': saveVersion,
+    'buildVersion': buildVersion,
+    'mapName': mapName,
+    'mapOptions': mapOptions,
+    'sessionName': sessionName,
+    'playDurationSeconds': playDurationSeconds,
+    'saveDateTime': saveDateTime,
+    'sessionVisibility': sessionVisibility,
+    'objects': []
+}
 
-print('///// END OF HEADER /////')
+print(json.dumps(saveJson,indent=4))
+input()
+
 
 # input()
+
+
 def nprint(x):
     pass
 
@@ -172,12 +199,13 @@ def readObjectType():
     return name
 
 
-def readPersistentLevel():
-    objectType = readObjectType()
+def readActor(nr):
+
+    className = readObjectType()
     levelName = readLevelName()
-    objectName = readObjectName()
+    pathName = readObjectName()
     zero = readInt()
-    if (zero != 0 and zero != 1):
+    if (zero != 1):
         print(zero)
         input()
 
@@ -188,41 +216,66 @@ def readPersistentLevel():
     x=readFloat()
     y=readFloat()
     z=readFloat()
-    rest = readHex(16)
+    sx = readFloat()
+    sy = readFloat()
+    sz = readFloat()
+    active = readInt()
+    rest = readHex(4)
 
-    if x == -2954079232.0 or z == 59927.625 or y == -1919341.0: # foliage removal
-        return
+    #if x == -2954079232.0 or z == 59927.625 or y == -1919341.0: # foliage removal
+        #return
+#
+    #if (z > 50000):
+        #input()
+#
+    #if x< -25000000:
+        #print(x)
+        #print(y)
+        #print(z)
+        #input()
 
-    if (z > 50000):
-        input()
+    actor = {
+        'className': className,
+        'levelName': levelName,
+        'pathName': pathName,
+        'transform': {
+            'rotation': [a, b, c, d],
+            'translation': [x, y, z],
+            'scale3d': [sx,sy,sz],
 
-    if x< -25000000:
-        print(x)
-        print(y)
-        print(z)
-        input()
+        },
+        'needTransform': active,
+        'wasPlacedInLevel': rest
+    }
+
+    print(json.dumps(actor))
+
+    #elementWriter.writerow([zero, rest, objectType, levelName, objectName, x, y, z, a, b, c, d, sx, sy, sz])
+    #pointWriter.writerow([x,y,z,objectType])
+    #print('---')
+
+    #outp = open('output/'+str(nr)+'.txt','w')
+    #outp.write(objectType+'\n'
+        #+levelName+'\n'
+        #+objectName+'\n'
+        #+str(a)+', ' + str(b)+', '+str(c)+', ' +str(d) +'\n'
+        #+ str(x)+', '+str(y)+', '+ str(z)+'\n'
+        #+ str(sx) + ', '+ str(sy) + ', '+ str(sz) +'\n'
+        #+ rest + '\n---\n\n')
+    #outp.close()
 
 
-    elementWriter.writerow([zero, rest, objectType, levelName, objectName, x, y, z, a, b, c, d])
-    pointWriter.writerow([x,y,z,objectType])
+def readPlayerState(nr):
+    objectType = readObjectType()
+    levelName = readLevelName()
+    objectName = readObjectName()
+    unkn4 = readLengthPrefixedString()
     print('---')
 
-def readPlayerState():
-    readObjectType()
-    readLevelName()
-    readObjectName()
-    print(readLengthPrefixedString())
-    print('---')
+    outp = open('output/'+str(nr)+'.txt','w')
+    outp.write(objectType+'\n'+levelName+'\n'+objectName+'\n'+unkn4+'\n---\n\n')
+    outp.close()
 
-def readPersistentLevelNone12():
-    print(readInt())
-    print(readString(f)) # None
-    print(f.read(12))
-    print(readString(f)) # Persistent_Level
-    print(f.read(4))
-    print(readString(f)) # Persistent_Level:PersistentLevel.FGWorldSettings
-    print(f.read(4))
-    print('---')
 
 type0Count = 0
 
@@ -230,9 +283,9 @@ for i in range(0, entryCount):#10203):
     type = readInt()
     print('type: ' + str(type))
     if type == 1:
-        readPersistentLevel()
+        readActor(i)
     elif type == 0:
-        readPlayerState()
+        readPlayerState(i)
         type0Count += 1
     else:
         print('unknown type ' + str(type))
@@ -270,6 +323,14 @@ def readProperty():
             readHex(29) # TODO ...?
         elif type == 'Box':
             readHex(42)
+        elif type == 'LinearColor':
+            readHex(33)
+        elif type == 'Transform':
+            readHex(17)
+            while (readProperty()):
+                pass
+        elif type == 'Quat':
+            readHex(33)
         elif type == 'RemovedInstanceArray' or type == 'InventoryStack':
             readHex(17) # TODO ...?
             while (readProperty()):
@@ -364,6 +425,51 @@ def readProperty():
         print(readLengthPrefixedString())
     elif prop == '':
         return False # End of this Entity
+    elif prop == 'MapProperty':
+        readHex(8)
+        print(readLengthPrefixedString()) # IntProperty
+        print(readLengthPrefixedString()) # StructProperty
+        readHex(5)
+        
+        count = readInt()
+        print('count: ' +str(count))
+        for i in range(0,count):
+            readInt()
+            readProperty()
+            readProperty()
+        
+        '''
+        print(readLengthPrefixedString()) # Buildables
+        print(readLengthPrefixedString()) # ArrayProperty
+        readHex(8)
+        print(readLengthPrefixedString()) # ObjectProperty
+        readHex(1)
+        count = readInt()
+        for i in range(0,count):
+            print(readLengthPrefixedString()) # Persistent_Level
+            print(readLengthPrefixedString()) # Persistent_Level:PersistentLevel.Build_Foundation_8x2_01_C_0
+        '''
+
+    elif prop == 'ByteProperty':
+        readHex(8)
+        unk1 = readLengthPrefixedString() # EGamePhase
+        print(unk1)
+        if unk1 == 'EGamePhase':
+            readHex(1)
+            print(readLengthPrefixedString()) # EGP_MidGame
+        elif unk1 == 'None':
+            readHex(2)
+        else:    
+            print('unknown byte property ' + unk1)        
+            readHex(32)
+            readHex(32)
+            readHex(32)
+            input()
+
+    elif prop == 'TextProperty':
+        readHex(22)
+        print(readLengthPrefixedString())
+
     else:
         print('Unknown property type: ' + prop)
         readHex(32)
@@ -417,8 +523,9 @@ for i in range(0,elementCount):
         #readProperty()
         #readProperty()
     print(': ' + str(i))
+    sys.stdout = open('output/'+str(i)+'.txt', 'a')
     if i < 10203:
-
+        
         readEntity(length)
     else:
         bytesRead = 0
@@ -435,5 +542,6 @@ for i in range(0,elementCount):
             readHex(32)
             input()
             assert False
+    sys.stdout = sys.__stdout__
         
 print('finished')
