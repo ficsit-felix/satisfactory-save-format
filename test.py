@@ -9,12 +9,13 @@ import binascii
 import sys
 import json
 
+
 def readcstr(f):
     toeof = iter(functools.partial(f.read, 1), '')
     return ''.join(itertools.takewhile(b'0'.__ne__, toeof))
 
-f = open("big.sav", "rb")
 
+f = open("big.sav", "rb")
 
 
 levelWriter = csv.writer(open('levels.csv', 'w', newline=''))
@@ -27,16 +28,22 @@ pointWriter.writerow(['x', 'y', 'z', 'type'])
 
 bytesRead = 0
 
+def assertFail(message):
+    print('failed: ' +message)
+    input()
+    assert False
+
 
 def readString(myfile):
     chars = []
     while True:
         c = myfile.read(1)
-        #print(c)
+        # print(c)
 #        print(b'0')
         if c is None or c == b'\x00':
             return b''.join(chars).decode('ascii')
         chars.append(c)
+
 
 def readLengthPrefixedString():
     global bytesRead
@@ -57,27 +64,36 @@ def readLengthPrefixedString():
     return chars.decode('ascii')
 
 
-
 def readInt():
     global bytesRead
     bytesRead += 4
     return struct.unpack('i', f.read(4))[0]
     # return int.from_bytes(f.read(4), byteorder='little')
 
+
 def readFloat():
     global bytesRead
     bytesRead += 4
     return struct.unpack('f', f.read(4))[0]
 
+
 def readLong():
     global bytesRead
     bytesRead += 8
     return struct.unpack('l', f.read(8))[0]
-    
+
+
 def readByte():
     global bytesRead
     bytesRead += 1
     return struct.unpack('b', f.read(1))[0]
+
+def assertNullByte():
+    global bytesRead
+    bytesRead += 1
+    zero = f.read(1)
+    if zero !=  b'\x00':
+        assertFail('not null but ' + zero)
 
 def readHex(count):
     global bytesRead
@@ -89,7 +105,7 @@ def readHex(count):
     for i in chars:
         print(format(i, '02x'), end=' ')
         result += format(i, '02x') + ' '
-        c+=1
+        c += 1
         if (c % 4 == 0):
             print('', end=' ')
             result += ' '
@@ -102,7 +118,7 @@ def readHex(count):
             print(chr(i), end='')
         else:
             print('.', end='')
-        c+=1
+        c += 1
         if (c % 4 == 0):
             print('', end=' ')
     print('')
@@ -140,23 +156,23 @@ def readHex(count):
 '''
 print('START OF HEADERq')
 saveHeaderType = readInt()
-saveVersion = readInt() # Save Version
-buildVersion = readInt() # BuildVersion
+saveVersion = readInt()  # Save Version
+buildVersion = readInt()  # BuildVersion
 
-mapName = readLengthPrefixedString() # MapName
-mapOptions = readLengthPrefixedString() # MapOptions
-sessionName = readLengthPrefixedString() # SessionName
-playDurationSeconds = readInt() # PlayDurationSeconds
+mapName = readLengthPrefixedString()  # MapName
+mapOptions = readLengthPrefixedString()  # MapOptions
+sessionName = readLengthPrefixedString()  # SessionName
+playDurationSeconds = readInt()  # PlayDurationSeconds
 
-saveDateTime = readLong() # SaveDateTime
+saveDateTime = readLong()  # SaveDateTime
 saveDateSeconds = saveDateTime / 10000000
 # see https://stackoverflow.com/a/1628018
 print(saveDateSeconds-62135596800)
 
 # print(readLong())
-sessionVisibility = readByte() # SessionVisibility
+sessionVisibility = readByte()  # SessionVisibility
 
-entryCount = readInt() #  total entries
+entryCount = readInt()  # total entries
 saveJson = {
     'saveHeaderType': saveHeaderType,
     'saveVersion': saveVersion,
@@ -170,9 +186,6 @@ saveJson = {
     'objects': []
 }
 
-print(json.dumps(saveJson,indent=4))
-input()
-
 
 # input()
 
@@ -180,17 +193,20 @@ input()
 def nprint(x):
     pass
 
+
 def readLevelName():
     name = readLengthPrefixedString()
     levelWriter.writerow([name])
     print(name)
     return name
 
+
 def readObjectName():
     name = readLengthPrefixedString()
     objectWriter.writerow([name])
     print(name)
     return name
+
 
 def readObjectType():
     name = readLengthPrefixedString()
@@ -204,101 +220,78 @@ def readActor(nr):
     className = readObjectType()
     levelName = readLevelName()
     pathName = readObjectName()
-    zero = readInt()
-    if (zero != 1):
-        print(zero)
-        input()
+    needTransform = readInt()
 
-    a=readFloat()
-    b=readFloat()
-    c=readFloat()
-    d=readFloat()
-    x=readFloat()
-    y=readFloat()
-    z=readFloat()
+    a = readFloat()
+    b = readFloat()
+    c = readFloat()
+    d = readFloat()
+    x = readFloat()
+    y = readFloat()
+    z = readFloat()
     sx = readFloat()
     sy = readFloat()
     sz = readFloat()
-    active = readInt()
-    rest = readHex(4)
 
-    #if x == -2954079232.0 or z == 59927.625 or y == -1919341.0: # foliage removal
-        #return
-#
-    #if (z > 50000):
-        #input()
-#
-    #if x< -25000000:
-        #print(x)
-        #print(y)
-        #print(z)
-        #input()
+    wasPlacedInLevel = readInt()
 
-    actor = {
+    return {
+        'type': 1,
         'className': className,
         'levelName': levelName,
         'pathName': pathName,
+        'needTransform': needTransform,
         'transform': {
             'rotation': [a, b, c, d],
             'translation': [x, y, z],
-            'scale3d': [sx,sy,sz],
+            'scale3d': [sx, sy, sz],
 
         },
-        'needTransform': active,
-        'wasPlacedInLevel': rest
+        'wasPlacedInLevel': wasPlacedInLevel,
+        'properties': []
     }
 
-    print(json.dumps(actor))
-
-    #elementWriter.writerow([zero, rest, objectType, levelName, objectName, x, y, z, a, b, c, d, sx, sy, sz])
-    #pointWriter.writerow([x,y,z,objectType])
-    #print('---')
-
-    #outp = open('output/'+str(nr)+'.txt','w')
-    #outp.write(objectType+'\n'
-        #+levelName+'\n'
-        #+objectName+'\n'
-        #+str(a)+', ' + str(b)+', '+str(c)+', ' +str(d) +'\n'
-        #+ str(x)+', '+str(y)+', '+ str(z)+'\n'
-        #+ str(sx) + ', '+ str(sy) + ', '+ str(sz) +'\n'
-        #+ rest + '\n---\n\n')
-    #outp.close()
-
-
-def readPlayerState(nr):
-    objectType = readObjectType()
+def readObject(nr):
+    className = readObjectType()
     levelName = readLevelName()
-    objectName = readObjectName()
-    unkn4 = readLengthPrefixedString()
-    print('---')
+    pathName = readObjectName()
+    outerPathName = readLengthPrefixedString()
 
-    outp = open('output/'+str(nr)+'.txt','w')
-    outp.write(objectType+'\n'+levelName+'\n'+objectName+'\n'+unkn4+'\n---\n\n')
-    outp.close()
+    return {
+        'type': 0,
+        'className': className,
+        'levelName': levelName,
+        'pathName': pathName,
+        'outerPathName': outerPathName,
+        'properties': []
+    }
 
 
 type0Count = 0
 
-for i in range(0, entryCount):#10203):
+for i in range(0, entryCount): 
     type = readInt()
     print('type: ' + str(type))
     if type == 1:
-        readActor(i)
+        saveJson["objects"].append(readActor(i))
     elif type == 0:
-        readPlayerState(i)
+        saveJson["objects"].append(readObject(i))
         type0Count += 1
     else:
         print('unknown type ' + str(type))
-        assert False 
+        assert False
 
 print('type0Count: ' + str(type0Count))
 
 
 elementCount = readInt()
+
+
 def readNull():
     readHex(12)
     print(readLengthPrefixedString())
     readHex(4)
+
 
 def readProperty():
     name = readLengthPrefixedString()
@@ -307,7 +300,7 @@ def readProperty():
         return
 
     prop = readLengthPrefixedString()
-
+  
     print('- ' + prop + ' ' + name)
     if prop == 'IntProperty':
         readHex(9)
@@ -315,12 +308,13 @@ def readProperty():
     elif prop == 'StrProperty':
         readHex(9)
         print(readLengthPrefixedString())
+        input()
     elif prop == 'StructProperty':
         readHex(8)
         type = readLengthPrefixedString()
         print('structType: ' + type)
         if type == 'Vector' or type == 'Rotator':
-            readHex(29) # TODO ...?
+            readHex(29)  # TODO ...?
         elif type == 'Box':
             readHex(42)
         elif type == 'LinearColor':
@@ -332,7 +326,7 @@ def readProperty():
         elif type == 'Quat':
             readHex(33)
         elif type == 'RemovedInstanceArray' or type == 'InventoryStack':
-            readHex(17) # TODO ...?
+            readHex(17)  # TODO ...?
             while (readProperty()):
                 pass
         elif type == 'InventoryItem':
@@ -351,10 +345,10 @@ def readProperty():
             readHex(32)
             input()
             assert False
-        
+
     elif prop == 'ArrayProperty':
-        print(readInt()) # 964 length of the array property?
-        print(readInt()) # 0
+        print(readInt())  # 964 length of the array property?
+        print(readInt())  # 0
         itemType = readLengthPrefixedString()
         print('itemType: ' + itemType)
         readHex(1)
@@ -368,8 +362,8 @@ def readProperty():
             print(readLengthPrefixedString())
             print(readLengthPrefixedString())
             readHex(8)
-            
-            type = readLengthPrefixedString() #  MessageData
+
+            type = readLengthPrefixedString()  # MessageData
             print(type)
 
             readHex(17)
@@ -397,7 +391,7 @@ def readProperty():
                 readHex(32)
                 input()
             '''
-        elif  itemType == 'IntProperty':
+        elif itemType == 'IntProperty':
             for i in range(0, count):
                 print(readInt())
         else:
@@ -407,37 +401,41 @@ def readProperty():
             assert False
     elif prop == 'ObjectProperty':
         readHex(9)
-        print(readLengthPrefixedString()) # Persistent_Level
+        print(readLengthPrefixedString())  # Persistent_Level
         print(readLengthPrefixedString())
     elif prop == 'BoolProperty':
-        readHex(10)
+        readHex(8)
+        print(readByte())
+        readHex(1)
+        input()
     elif prop == 'FloatProperty':
         readHex(9)
         print(readFloat())
     elif prop == 'EnumProperty':
-        print(readInt()) # 43
+        print(readInt())  # 43
         readHex(4)
-        print(readLengthPrefixedString()) # EIntroTutorialSteps
+        print(readLengthPrefixedString())  # EIntroTutorialSteps
         readHex(1)
-        print(readLengthPrefixedString()) # EIntroTutorialSteps::ITS_DISMANTLE_POD
+        # EIntroTutorialSteps::ITS_DISMANTLE_POD
+        print(readLengthPrefixedString())
     elif prop == 'NameProperty':
         readHex(9)
         print(readLengthPrefixedString())
     elif prop == '':
-        return False # End of this Entity
+        return False  # End of this Entity
     elif prop == 'MapProperty':
         readHex(8)
-        print(readLengthPrefixedString()) # IntProperty
-        print(readLengthPrefixedString()) # StructProperty
+        print(readLengthPrefixedString())  # IntProperty
+        print(readLengthPrefixedString())  # StructProperty
         readHex(5)
-        
+
         count = readInt()
-        print('count: ' +str(count))
-        for i in range(0,count):
+        print('count: ' + str(count))
+        for i in range(0, count):
             readInt()
             readProperty()
             readProperty()
-        
+
         '''
         print(readLengthPrefixedString()) # Buildables
         print(readLengthPrefixedString()) # ArrayProperty
@@ -452,15 +450,15 @@ def readProperty():
 
     elif prop == 'ByteProperty':
         readHex(8)
-        unk1 = readLengthPrefixedString() # EGamePhase
+        unk1 = readLengthPrefixedString()  # EGamePhase
         print(unk1)
         if unk1 == 'EGamePhase':
             readHex(1)
-            print(readLengthPrefixedString()) # EGP_MidGame
+            print(readLengthPrefixedString())  # EGP_MidGame
         elif unk1 == 'None':
             readHex(2)
-        else:    
-            print('unknown byte property ' + unk1)        
+        else:
+            print('unknown byte property ' + unk1)
             readHex(32)
             readHex(32)
             readHex(32)
@@ -484,16 +482,16 @@ def readEntity(length):
     mapName = readLengthPrefixedString()
     entityName = readLengthPrefixedString()
     print('map: ' + mapName)
-    print('entity: '+ entityName)
+    print('entity: ' + entityName)
 
-    childCount = readInt() # TODO maybe child count? seems to 
+    childCount = readInt()  # TODO maybe child count? seems to
     if childCount > 0:
         print('children('+str(childCount)+'): [')
         for i in range(0, childCount):
             print('    ' + readLengthPrefixedString())
             print('    ' + readLengthPrefixedString())
         print(']')
-    
+
     # print('..'+ str(bytesRead))
     while (readProperty()):
         print('------')
@@ -508,24 +506,22 @@ def readEntity(length):
         readHex(32)
         input()
         assert False
-        
 
 
-for i in range(0,elementCount):
+for i in range(0, elementCount):
     length = readInt()  # TODO: might actually be length of the following entry?
     print('length: ' + str(length))
 
 #
-        #print(readLengthPrefixedString())
-        #print(readLengthPrefixedString())
-        #readInt()
-        #readProperty()
-        #readProperty()
-        #readProperty()
+    # print(readLengthPrefixedString())
+    # print(readLengthPrefixedString())
+    # readInt()
+    # readProperty()
+    # readProperty()
+    # readProperty()
     print(': ' + str(i))
-    sys.stdout = open('output/'+str(i)+'.txt', 'a')
+    # sys.stdout = open('output/'+str(i)+'.txt', 'a')
     if i < 10203:
-        
         readEntity(length)
     else:
         bytesRead = 0
@@ -533,7 +529,7 @@ for i in range(0,elementCount):
         while readProperty():
             pass
         missing = length - bytesRead
-        print ('miss' + str(missing))
+        print('miss' + str(missing))
         if missing > 0:
             print('$ got missing ('+str(missing)+'):')
             readHex(missing)
@@ -542,6 +538,9 @@ for i in range(0,elementCount):
             readHex(32)
             input()
             assert False
-    sys.stdout = sys.__stdout__
-        
+    # sys.stdout = sys.__stdout__
+
 print('finished')
+
+print(json.dumps(saveJson, indent=4))
+input()
