@@ -16,6 +16,9 @@ def readcstr(f):
 
 
 f = open("big.sav", "rb")
+f.seek(0, 2)
+fileSize = f.tell()
+f.seek(0, 0)
 
 
 levelWriter = csv.writer(open('levels.csv', 'w', newline=''))
@@ -127,34 +130,6 @@ def readHex(count):
 
 
 ### START OF HEADER ###
-'''
-              - LF_MEMBER [name = `FileTypeTag`, Type = 0x0074 (int), offset = 0, attrs = public]
-              - LF_MEMBER [name = `SaveGameFileVersion`, Type = 0x0074 (int), offset = 4, attrs = public]
-              - LF_MEMBER [name = `PackageFileUE4Version`, Type = 0x0074 (int), offset = 8, attrs = public]
-              - LF_MEMBER [name = `SavedEngineVersion`, Type = 0x7665, offset = 16, attrs = public]
-              - LF_MEMBER [name = `CustomVersionFormat`, Type = 0x0074 (int), offset = 48, attrs = public]
-              - LF_MEMBER [name = `CustomVersions`, Type = 0x26D7, offset = 56, attrs = public]
-              - LF_MEMBER [name = `SaveGameClassName`, Type = 0x102E, offset = 72, attrs = public]
-'''
-
-'''
-              - LF_METHOD [name = `FSaveHeader`, # overloads = 4, overload list = 0xEDCD4]
-              - LF_MEMBER [name = `SaveVersion`, Type = 0x0074 (int), offset = 0, attrs = public]
-              - LF_MEMBER [name = `BuildVersion`, Type = 0x0074 (int), offset = 4, attrs = public]
-              - LF_MEMBER [name = `SaveName`, Type = 0x102E, offset = 8, attrs = public]
-              - LF_MEMBER [name = `MapName`, Type = 0x102E, offset = 24, attrs = public]
-              - LF_MEMBER [name = `MapOptions`, Type = 0x102E, offset = 40, attrs = public]
-              - LF_MEMBER [name = `SessionName`, Type = 0x102E, offset = 56, attrs = public]
-              - LF_MEMBER [name = `PlayDurationSeconds`, Type = 0x0074 (int), offset = 72, attrs = public]
-              - LF_MEMBER [name = `SaveDateTime`, Type = 0x26F5, offset = 80, attrs = public]
-              - LF_MEMBER [name = `SessionVisibility`, Type = 0xEDCD5, offset = 88, attrs = public]
-              - LF_STMEMBER [name = `GUID`, type = 0x151D, attrs = public]
-              - LF_ONEMETHOD [name = `~FSaveHeader`]
-                type = 0xEDCD6, vftable offset = -1, attrs = public compiler-generated
-              - LF_METHOD [name = `operator=`, # overloads = 2, overload list = 0xEDCDA]
-              - LF_ONEMETHOD [name = `__vecDelDtor`]
-                type = 0xEDCDB, vftable offset = -1, attrs = public compiler-generated
-'''
 print('START OF HEADERq')
 saveHeaderType = readInt()
 saveVersion = readInt()  # Save Version
@@ -277,8 +252,7 @@ for i in range(0, entryCount):
         saveJson["objects"].append(readObject(i))
         type0Count += 1
     else:
-        print('unknown type ' + str(type))
-        assert False
+        assertFail('unknown type ' + str(type))
 
 print('type0Count: ' + str(type0Count))
 
@@ -465,7 +439,10 @@ def readProperty(properties):
             input()
             assert False
 
-        property['values'] = values
+        property['value'] = {
+            'type': itemType,
+            'values': values
+        }
     elif prop == 'ObjectProperty':
         assertNullByte()
         property['value'] = {
@@ -527,11 +504,7 @@ def readProperty(properties):
                 'unk2': readHex(2)
             }
         else:
-            print('unknown byte property ' + unk1)
-            readHex(32)
-            readHex(32)
-            readHex(32)
-            input()
+            assertFail('unknown byte property ' + unk1)
 
     elif prop == 'TextProperty':
         property['textUnknown'] = readHex(14) # TODO
@@ -607,7 +580,7 @@ for i in range(0, elementCount):
     else:
         saveJson['objects'][i]['entity'] = readEntity(False, length)
     # sys.stdout = sys.__stdout__
-
+saveJson['missing'] = readHex(fileSize - f.tell())
 print('finished')
 
 output = open('output.json', 'w')
