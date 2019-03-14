@@ -15,7 +15,7 @@ def readcstr(f):
     return ''.join(itertools.takewhile(b'0'.__ne__, toeof))
 
 
-f = open("big.sav", "rb")
+f = open("test.sav", "rb")
 f.seek(0, 2)
 fileSize = f.tell()
 f.seek(0, 0)
@@ -281,7 +281,8 @@ def readProperty(properties):
 
     property = {
         'name': name,
-        'type': prop
+        'type': prop,
+        '_length': length
     }
 
     if prop == 'IntProperty':
@@ -369,8 +370,8 @@ def readProperty(properties):
         elif type == 'InventoryItem':
             unk1 = readLengthPrefixedString() # TODO
             itemName = readLengthPrefixedString()
-            unk2 = readLengthPrefixedString() # TODO
-            unk3 = readLengthPrefixedString() # TODO
+            levelName = readLengthPrefixedString()
+            pathName = readLengthPrefixedString()
             # while readProperty():
             #   pass
             props = []
@@ -381,8 +382,8 @@ def readProperty(properties):
                 'type': type,
                 'unk1': unk1,
                 'itemName': itemName,
-                'unk2': unk2,
-                'unk3': unk3,
+                'levelName': levelName,
+                'pathName': pathName,
                 'properties': props
             }
         else:
@@ -421,7 +422,7 @@ def readProperty(properties):
             property['structInnerType'] = type
 
             property['structUnknown'] = readHex(17) # TODO what are those?
-
+            property['_structLength'] = structSize
             for i in range(0, count):
                 props = []
                 while (readProperty(props)):
@@ -499,15 +500,17 @@ def readProperty(properties):
                 'unk2': unk2
             }
         elif unk1 == 'None':
+            assertNullByte()
             property['value'] = {
                 'unk1': unk1,
-                'unk2': readHex(2)
+                'unk2': readByte()
             }
         else:
             assertFail('unknown byte property ' + unk1)
 
     elif prop == 'TextProperty':
-        property['textUnknown'] = readHex(14) # TODO
+        assertNullByte()
+        property['textUnknown'] = readHex(13) # TODO
         property['value'] = readLengthPrefixedString()
     else:
         print('Unknown property type: ' + prop)
