@@ -1,82 +1,50 @@
 #!/usr/bin/env python3
-
 """
-My personal testing script used in trying to figure out what each value is
+Converts Satisfactory save games (.sav) into a more readable format (.json)
 """
-
 import struct
-
 import functools
 import itertools
 import csv
 import binascii
 import sys
 import json
+import argparse
+import pathlib
 
+parser = argparse.ArgumentParser(description='Converts Satisfactory save games into a more readable format')
+parser.add_argument('file', metavar='FILE', type=str, help='save game to process (.sav file extension)')
+parser.add_argument('--output', '-o', type=str, help='output file (.json)')
 
-def readcstr(f):
-    toeof = iter(functools.partial(f.read, 1), '')
-    return ''.join(itertools.takewhile(b'0'.__ne__, toeof))
+args = parser.parse_args()
 
+extension = pathlib.Path(args.file).suffix
+if extension != '.sav':
+    print('error: extension of save file should be .sav', file=sys.stderr)
+    exit(1)
 
-f = open(sys.argv[1], 'rb')
+f = open(args.file, 'rb')
+
+# determine the file size so that we can
 f.seek(0, 2)
 fileSize = f.tell()
 f.seek(0, 0)
 
-
-levelWriter = csv.writer(open('levels.csv', 'w', newline=''))
-objectWriter = csv.writer(open('objects.csv', 'w', newline=''))
-objectTypeWriter = csv.writer(open('objectTypes.csv', 'w', newline=''))
-elementWriter = csv.writer(open('elements.csv', 'w', newline=''))
-pointWriter = csv.writer(open('points.csv', 'w', newline=''))
-pointWriter.writerow(['x', 'y', 'z', 'type'])
-
-
 bytesRead = 0
 
+
 def assertFail(message):
-    print('failed: ' +message)
+    print('assertion failed: ' + message, file=sys.stderr)
+    # show the next bytes to help debugging
     readHex(32)
     input()
     assert False
-
-
-def readString(myfile):
-    chars = []
-    while True:
-        c = myfile.read(1)
-        # print(c)
-#        print(b'0')
-        if c is None or c == b'\x00':
-            return b''.join(chars).decode('ascii')
-        chars.append(c)
-
-
-def readLengthPrefixedString():
-    global bytesRead
-    length = readInt()
-    # bytesRead += 4
-    if length == 0:
-        return ''
-
-    chars = f.read(length-1)
-    zero = f.read(1)
-    bytesRead += length
-    if zero != b'\x00':
-        if length > 100:
-            print('zero is ' + str(zero) + ' in ' + str(chars[0:100]))
-        else:
-            print('zero is ' + str(zero) + ' in ' + str(chars))
-        assert False
-    return chars.decode('ascii')
 
 
 def readInt():
     global bytesRead
     bytesRead += 4
     return struct.unpack('i', f.read(4))[0]
-    # return int.from_bytes(f.read(4), byteorder='little')
 
 
 def readFloat():
@@ -96,14 +64,41 @@ def readByte():
     bytesRead += 1
     return struct.unpack('b', f.read(1))[0]
 
+
 def assertNullByte():
     global bytesRead
     bytesRead += 1
     zero = f.read(1)
-    if zero !=  b'\x00':
+    if zero != b'\x00':
         assertFail('not null but ' + str(zero))
 
+
+def readLengthPrefixedString():
+    """
+    Reads a string that is prefixed with its length
+    """
+    global bytesRead
+    length = readInt()
+    # bytesRead += 4 # for some reason the int does not count to the bytes read
+    if length == 0:
+        return ''
+
+    chars = f.read(length-1)
+    zero = f.read(1)
+    bytesRead += length
+
+    if zero != b'\x00':  # We assume that the last byte of a string is alway \x00
+        if length > 100:
+            assertFail('zero is ' + str(zero) + ' in ' + str(chars[0:100]))
+        else:
+            assertFail('zero is ' + str(zero) + ' in ' + str(chars))
+    return chars.decode('ascii')
+
+
 def readHex(count):
+    """
+    Reads count bytes and returns their hex form
+    """
     global bytesRead
     bytesRead += count
 
@@ -111,30 +106,15 @@ def readHex(count):
     c = 0
     result = ''
     for i in chars:
-        print(format(i, '02x'), end=' ')
         result += format(i, '02x') + ' '
         c += 1
-        if (c % 4 == 0):
-            print('', end=' ')
+        if (c % 4 == 0 and c < count - 1):
             result += ' '
 
-    print(' | ', end='')
-
-    c = 0
-    for i in chars:
-        if (i > 31 and i < 128):
-            print(chr(i), end='')
-        else:
-            print('.', end='')
-        c += 1
-        if (c % 4 == 0):
-            print('', end=' ')
-    print('')
     return result
 
 
-### START OF HEADER ###
-print('START OF HEADERq')
+# Read the file header
 saveHeaderType = readInt()
 saveVersion = readInt()  # Save Version
 buildVersion = readInt()  # BuildVersion
@@ -145,11 +125,12 @@ sessionName = readLengthPrefixedString()  # SessionName
 playDurationSeconds = readInt()  # PlayDurationSeconds
 
 saveDateTime = readLong()  # SaveDateTime
+'''
+to convert this FDateTime to a unix timestamp use:
 saveDateSeconds = saveDateTime / 10000000
 # see https://stackoverflow.com/a/1628018
 print(saveDateSeconds-62135596800)
-
-# print(readLong())
+'''
 sessionVisibility = readByte()  # SessionVisibility
 
 entryCount = readInt()  # total entries
@@ -167,39 +148,10 @@ saveJson = {
 }
 
 
-# input()
-
-
-def nprint(x):
-    pass
-
-
-def readLevelName():
-    name = readLengthPrefixedString()
-    levelWriter.writerow([name])
-    print(name)
-    return name
-
-
-def readObjectName():
-    name = readLengthPrefixedString()
-    objectWriter.writerow([name])
-    print(name)
-    return name
-
-
-def readObjectType():
-    name = readLengthPrefixedString()
-    objectTypeWriter.writerow([name])
-    print(name)
-    return name
-
-
-def readActor(nr):
-
-    className = readObjectType()
-    levelName = readLevelName()
-    pathName = readObjectName()
+def readActor():
+    className = readLengthPrefixedString()
+    levelName = readLengthPrefixedString()
+    pathName = readLengthPrefixedString()
     needTransform = readInt()
 
     a = readFloat()
@@ -230,10 +182,11 @@ def readActor(nr):
         'wasPlacedInLevel': wasPlacedInLevel
     }
 
-def readObject(nr):
-    className = readObjectType()
-    levelName = readLevelName()
-    pathName = readObjectName()
+
+def readObject():
+    className = readLengthPrefixedString()
+    levelName = readLengthPrefixedString()
+    pathName = readLengthPrefixedString()
     outerPathName = readLengthPrefixedString()
 
     return {
@@ -244,42 +197,32 @@ def readObject(nr):
         'outerPathName': outerPathName
     }
 
-
-type0Count = 0
-
-for i in range(0, entryCount): 
+for i in range(0, entryCount):
     type = readInt()
-    print('type: ' + str(type))
     if type == 1:
-        saveJson["objects"].append(readActor(i))
+        saveJson['objects'].append(readActor())
     elif type == 0:
-        saveJson["objects"].append(readObject(i))
-        type0Count += 1
+        saveJson['objects'].append(readObject())
     else:
         assertFail('unknown type ' + str(type))
-
-print('type0Count: ' + str(type0Count))
 
 
 elementCount = readInt()
 
-
-def readNull():
-    readHex(12)
-    print(readLengthPrefixedString())
-    readHex(4)
+# So far these counts have always been the same and the entities seem to belong 1 to 1 to the actors/objects read above
+if elementCount != entryCount:
+    assertFail('elementCount ('+str(elementCount) +
+               ') != entryCount('+str(entryCount)+')')
 
 
 def readProperty(properties):
     name = readLengthPrefixedString()
     if name == 'None':
-        print('- [None]')
         return
 
     prop = readLengthPrefixedString()
     length = readInt()
     zero = readInt()
-    print('- ' + prop + ' ' + name + '(' + str(length)+')')
     if zero != 0:
         assertFail('not null: ' + str(zero))
 
@@ -292,29 +235,26 @@ def readProperty(properties):
     if prop == 'IntProperty':
         assertNullByte()
         property['value'] = readInt()
+
     elif prop == 'StrProperty':
         assertNullByte()
         property['value'] = readLengthPrefixedString()
+
     elif prop == 'StructProperty':
         type = readLengthPrefixedString()
-        print('structType: ' + type)
 
-        property['structUnknown'] = readHex(17) # TODO
+        property['structUnknown'] = readHex(17)  # TODO
 
         if type == 'Vector' or type == 'Rotator':
             x = readFloat()
             y = readFloat()
             z = readFloat()
-            print(x)
-            print(y)
-            print(z)
             property['value'] = {
                 'type': type,
                 'x': x,
                 'y': y,
                 'z': z
             }
-            
         elif type == 'Box':
             minX = readFloat()
             minY = readFloat()
@@ -347,7 +287,7 @@ def readProperty(properties):
                 pass
             property['value'] = {
                 'type': type,
-                'properties' : props
+                'properties': props
             }
 
         elif type == 'Quat':
@@ -372,15 +312,14 @@ def readProperty(properties):
                 'properties': props
             }
         elif type == 'InventoryItem':
-            unk1 = readLengthPrefixedString() # TODO
+            unk1 = readLengthPrefixedString()  # TODO
             itemName = readLengthPrefixedString()
             levelName = readLengthPrefixedString()
             pathName = readLengthPrefixedString()
-            # while readProperty():
-            #   pass
+
             props = []
             readProperty(props)
-            # can't consume null here because it might be needed by the overarching struct
+            # can't consume null here because it is needed by the entaingling struct
 
             property['value'] = {
                 'type': type,
@@ -391,17 +330,12 @@ def readProperty(properties):
                 'properties': props
             }
         else:
-            print('Unknown type: ' + type)
-            readHex(32)
-            input()
-            assert False
+            assertFail('Unknown type: ' + type)
 
     elif prop == 'ArrayProperty':
         itemType = readLengthPrefixedString()
-        print('itemType: ' + itemType)
         assertNullByte()
         count = readInt()
-        print('count: ' + str(count))
         values = []
 
         if itemType == 'ObjectProperty':
@@ -417,15 +351,13 @@ def readProperty(properties):
             zero = readInt()
             if zero != 0:
                 assertFail('not zero: ' + str(zero))
-            print(structName + ' ' + structType + ' '+ str(structSize))
-            type = readLengthPrefixedString()  # MessageData
-            print(type)
+            type = readLengthPrefixedString()  
 
             property['structName'] = structName
             property['structType'] = structType
             property['structInnerType'] = type
 
-            property['structUnknown'] = readHex(17) # TODO what are those?
+            property['structUnknown'] = readHex(17)  # TODO what are those?
             property['_structLength'] = structSize
             for i in range(0, count):
                 props = []
@@ -434,15 +366,12 @@ def readProperty(properties):
                 values.append({
                     'properties': props
                 })
-                
+
         elif itemType == 'IntProperty':
             for i in range(0, count):
                 values.append(readInt())
         else:
-            print('unknown itemType ' + itemType)
-            readHex(32)
-            input()
-            assert False
+            assertFail('unknown itemType ' + itemType)
 
         property['value'] = {
             'type': itemType,
@@ -457,11 +386,11 @@ def readProperty(properties):
     elif prop == 'BoolProperty':
         property['value'] = readByte()
         assertNullByte()
-    elif prop == 'FloatProperty': # TimeStamps that are FloatProperties are negative to the current time in seconds?
+    elif prop == 'FloatProperty':  # TimeStamps that are FloatProperties are negative to the current time in seconds?
         assertNullByte()
         property['value'] = readFloat()
     elif prop == 'EnumProperty':
-        enumName = readLengthPrefixedString() 
+        enumName = readLengthPrefixedString()
         assertNullByte()
         valueName = readLengthPrefixedString()
         property['value'] = {
@@ -477,7 +406,6 @@ def readProperty(properties):
         for i in range(0, 5):
             assertNullByte()
         count = readInt()
-        print('count: ' + str(count))
         values = {
         }
         for i in range(0, count):
@@ -492,10 +420,9 @@ def readProperty(properties):
             'type': valueType,
             'values': values
         }
-    elif prop == 'ByteProperty':# TODO
+    elif prop == 'ByteProperty':  # TODO
 
         unk1 = readLengthPrefixedString()  # TODO
-        print(unk1)
         if unk1 == 'EGamePhase':
             assertNullByte()
             unk2 = readLengthPrefixedString()  # TODO
@@ -514,16 +441,14 @@ def readProperty(properties):
 
     elif prop == 'TextProperty':
         assertNullByte()
-        property['textUnknown'] = readHex(13) # TODO
+        property['textUnknown'] = readHex(13)  # TODO
         property['value'] = readLengthPrefixedString()
     else:
-        print('Unknown property type: ' + prop)
-        readHex(32)
-        input()
-        assert False
+        assertFail('Unknown property type: ' + prop)
 
     properties.append(property)
     return True
+
 
 def readEntity(withNames, length):
     global bytesRead
@@ -532,14 +457,12 @@ def readEntity(withNames, length):
     entity = {}
 
     if withNames:
-
         entity['levelName'] = readLengthPrefixedString()
         entity['pathName'] = readLengthPrefixedString()
         entity['children'] = []
 
-        childCount = readInt()  # TODO maybe child count? seems to
+        childCount = readInt()
         if childCount > 0:
-#            print('children('+str(childCount)+'): [')
             for i in range(0, childCount):
                 levelName = readLengthPrefixedString()
                 pathName = readLengthPrefixedString()
@@ -547,50 +470,38 @@ def readEntity(withNames, length):
                     'levelName': levelName,
                     'pathName': pathName
                 })
-                #print('    ' + readLengthPrefixedString())
-                #print('    ' + readLengthPrefixedString())
-#            print(']')
-
-    # print('..'+ str(bytesRead))
     entity['properties'] = []
     while (readProperty(entity['properties'])):
-        print('------')
         pass
+
+    # read missing bytes at the end of this entity.
+    # maybe we missed something while parsing the properties?
     missing = length - bytesRead
     if missing > 0:
-        print('$ got missing ('+str(missing)+'):')
         entity['missing'] = readHex(missing)
     elif missing < 0:
         assertFail('negative missing amount: ' + str(missing))
-        
 
     return entity
 
 
-
-
 for i in range(0, elementCount):
-    length = readInt()  # TODO: might actually be length of the following entry?
-    print('length: ' + str(length))
-
-#
-    # print(readLengthPrefixedString())
-    # print(readLengthPrefixedString())
-    # readInt()
-    # readProperty()
-    # readProperty()
-    # readProperty()
-    print(': ' + str(i))
-    # sys.stdout = open('output/'+str(i)+'.txt', 'a')
-    if i < elementCount - type0Count:
+    length = readInt()  # length of this entry
+    if saveJson['objects'][i]['type'] == 1:
         saveJson['objects'][i]['entity'] = readEntity(True, length)
     else:
         saveJson['objects'][i]['entity'] = readEntity(False, length)
-    # sys.stdout = sys.__stdout__
-saveJson['missing'] = readHex(fileSize - f.tell())
-print('finished')
 
-output = open('output.json', 'w')
-output.write(json.dumps(saveJson, indent=4))
+
+# store the remaining bytes as well so that we can recreate the exact same save file
+saveJson['missing'] = readHex(fileSize - f.tell())
+
+
+if args.output == None:
+    output_file = pathlib.Path(args.file).stem + '.json'
+else:
+    output_file = args.output
+output = open(output_file, 'w')
+output.write(json.dumps(saveJson))
 output.close()
-print('done')
+print('converted savegame saved to ' + output_file)
