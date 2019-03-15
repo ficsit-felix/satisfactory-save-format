@@ -1,14 +1,39 @@
 #!/usr/bin/env python3
+"""
+Converts from the more readable format (.json) back to a Satisfactory save game (.sav)
+"""
+
 import struct
 import json
+import argparse
+import pathlib
+import sys
 
-f = open("output.json", "r")
+parser = argparse.ArgumentParser(
+    description='Converts from the more readable format back to a Satisfactory save game')
+parser.add_argument('file', metavar='FILE', type=str,
+                    help='json file to process')
+parser.add_argument('--output', '-o', type=str, help='output file (.sav)')
+args = parser.parse_args()
+
+extension = pathlib.Path(args.file).suffix
+if extension == '.sav':
+    print('error: extension of save file should be .json', file=sys.stderr)
+    exit(1)
+
+f = open(args.file, 'r')
 saveJson = json.loads(f.read())
 
-output = open("out.sav", "wb")
+if args.output == None:
+    output_file = pathlib.Path(args.file).stem + '.sav'
+else:
+    output_file = args.output
+
+output = open(output_file, 'wb')
 
 
 buffers = []
+
 
 def write(bytes, count=True):
     if len(buffers) == 0:
@@ -18,12 +43,18 @@ def write(bytes, count=True):
         if count:
             buffers[len(buffers)-1]['length'] += len(bytes)
 
-# pushes a new buffer to the stack, so that the length of the following content can be written before the content
-def addBuffer():
-    buffers.append({'buffer':[], 'length':0})
 
-# ends the top buffer and writes it's context prefixed by the length (possibly into another buffer)
+def addBuffer():
+    """
+    pushes a new buffer to the stack, so that the length of the following content can be written before the content
+    """
+    buffers.append({'buffer': [], 'length': 0})
+
+
 def endBufferAndWriteSize():
+    """
+    ends the top buffer and writes it's context prefixed by the length (possibly into another buffer)
+    """
     buffer = buffers[len(buffers)-1]
     buffers.remove(buffer)
     # writeInt(26214) # TODO length
@@ -32,22 +63,28 @@ def endBufferAndWriteSize():
         write(b)
     return buffer['length']
 
+
 def assertFail(message):
-    print('failed: ' +message)
+    print('failed: ' + message)
     input()
     assert False
+
 
 def writeInt(value, count=True):
     write(struct.pack('i', value), count)
 
+
 def writeFloat(value):
     write(struct.pack('f', value))
+
 
 def writeLong(value):
     write(struct.pack('l', value))
 
+
 def writeByte(value, count=True):
     write(struct.pack('b', value), count)
+
 
 def writeLengthPrefixedString(value, count=True):
     if len(value) == 0:
@@ -58,9 +95,11 @@ def writeLengthPrefixedString(value, count=True):
         write(struct.pack('b', ord(i)), count)
     write(b'\x00', count)
 
+
 def writeHex(value, count=True):
     write(bytearray.fromhex(value), count)
-    
+
+
 # Header
 writeInt(saveJson['saveHeaderType'])
 writeInt(saveJson['saveVersion'])
@@ -73,6 +112,7 @@ writeLong(saveJson['saveDateTime'])
 writeByte(saveJson['sessionVisibility'])
 
 writeInt(len(saveJson['objects']))
+
 
 def writeActor(obj):
     writeLengthPrefixedString(obj['className'])
@@ -91,11 +131,13 @@ def writeActor(obj):
     writeFloat(obj['transform']['scale3d'][2])
     writeInt(obj['wasPlacedInLevel'])
 
+
 def writeObject(obj):
     writeLengthPrefixedString(obj['className'])
     writeLengthPrefixedString(obj['levelName'])
     writeLengthPrefixedString(obj['pathName'])
     writeLengthPrefixedString(obj['outerPathName'])
+
 
 for obj in saveJson['objects']:
     writeInt(obj['type'])
@@ -105,8 +147,9 @@ for obj in saveJson['objects']:
         writeObject(obj)
     else:
         assertFail('unknown type ' + str(type))
-    
+
 writeInt(len(saveJson['objects']))
+
 
 def writeProperty(property):
     writeLengthPrefixedString(property['name'])
@@ -133,8 +176,8 @@ def writeProperty(property):
         writeByte(0, count=False)
         writeHex(property['textUnknown'])
         writeLengthPrefixedString(property['value'])
-    elif type == 'ByteProperty':# TODO
-        
+    elif type == 'ByteProperty':  # TODO
+
         writeLengthPrefixedString(property['value']['unk1'], count=False)
         if property['value']['unk1'] == 'EGamePhase':
             writeByte(0, count=False)
@@ -193,11 +236,12 @@ def writeProperty(property):
             writeLengthPrefixedString(property['value']['pathName'])
             oldval = buffers[len(buffers)-1]['length']
             writeProperty(property['value']['properties'][0])
-            buffers[len(buffers)-1]['length'] = oldval + 4 # Dirty hack to make in this one case the inner property only take up 4 bytes
+            # Dirty hack to make in this one case the inner property only take up 4 bytes
+            buffers[len(buffers)-1]['length'] = oldval + 4
 
-    elif type == 'ArrayProperty':       
+    elif type == 'ArrayProperty':
         itemType = property['value']['type']
-        writeLengthPrefixedString(itemType, count=False) 
+        writeLengthPrefixedString(itemType, count=False)
         writeByte(0, count=False)
         writeInt(len(property['value']['values']))
         if itemType == 'IntProperty':
@@ -220,14 +264,15 @@ def writeProperty(property):
                 writeNone()
             structLength = endBufferAndWriteSize()
             if (structLength != property['_structLength']):
-                print('struct: ' +str(structLength) + '/' + str(property['_structLength']))
+                print('struct: ' + str(structLength) +
+                      '/' + str(property['_structLength']))
                 print(json.dumps(property, indent=4))
-    elif type == 'MapProperty':    
+    elif type == 'MapProperty':
         writeLengthPrefixedString(property['value']['name'], count=False)
         writeLengthPrefixedString(property['value']['type'], count=False)
         writeByte(0, count=False)
-        writeInt(0) # for some reason this counts towards the length
-            
+        writeInt(0)  # for some reason this counts towards the length
+
         writeInt(len(property['value']['values']))
         for key, value in property['value']['values'].items():
             writeInt(int(key))
@@ -240,12 +285,12 @@ def writeProperty(property):
         print(json.dumps(property, indent=4))
 
 
-
 def writeNone():
     writeLengthPrefixedString('None')
 
+
 def writeEntity(withNames, obj):
-    addBuffer() # size will be written at this place later
+    addBuffer()  # size will be written at this place later
     if withNames:
         writeLengthPrefixedString(obj['levelName'])
         writeLengthPrefixedString(obj['pathName'])
@@ -260,6 +305,7 @@ def writeEntity(withNames, obj):
 
     writeHex(obj['missing'])
     endBufferAndWriteSize()
+
 
 for obj in saveJson['objects']:
     if obj['type'] == 1:

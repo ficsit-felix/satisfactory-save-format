@@ -12,8 +12,10 @@ import json
 import argparse
 import pathlib
 
-parser = argparse.ArgumentParser(description='Converts Satisfactory save games into a more readable format')
-parser.add_argument('file', metavar='FILE', type=str, help='save game to process (.sav file extension)')
+parser = argparse.ArgumentParser(
+    description='Converts Satisfactory save games into a more readable format')
+parser.add_argument('file', metavar='FILE', type=str,
+                    help='save game to process (.sav file extension)')
 parser.add_argument('--output', '-o', type=str, help='output file (.json)')
 
 args = parser.parse_args()
@@ -197,6 +199,7 @@ def readObject():
         'outerPathName': outerPathName
     }
 
+
 for i in range(0, entryCount):
     type = readInt()
     if type == 1:
@@ -351,7 +354,7 @@ def readProperty(properties):
             zero = readInt()
             if zero != 0:
                 assertFail('not zero: ' + str(zero))
-            type = readLengthPrefixedString()  
+            type = readLengthPrefixedString()
 
             property['structName'] = structName
             property['structType'] = structType
