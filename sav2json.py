@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('file', metavar='FILE', type=str,
                     help='save game to process (.sav file extension)')
 parser.add_argument('--output', '-o', type=str, help='output file (.json)')
+parser.add_argument('--pretty', '-p', help='pretty print json', action='store_true')
 
 args = parser.parse_args()
 
@@ -38,7 +39,7 @@ bytesRead = 0
 def assertFail(message):
     print('assertion failed: ' + message, file=sys.stderr)
     # show the next bytes to help debugging
-    readHex(32)
+    print(readHex(32))
     input()
     assert False
 
@@ -81,7 +82,6 @@ def readLengthPrefixedString():
     """
     global bytesRead
     length = readInt()
-    # bytesRead += 4 # for some reason the int does not count to the bytes read
     if length == 0:
         return ''
 
@@ -227,6 +227,7 @@ def readProperty(properties):
     length = readInt()
     zero = readInt()
     if zero != 0:
+        print(name+ ' ' + prop)
         assertFail('not null: ' + str(zero))
 
     property = {
@@ -426,22 +427,20 @@ def readProperty(properties):
     elif prop == 'ByteProperty':  # TODO
 
         unk1 = readLengthPrefixedString()  # TODO
-        if unk1 == 'EGamePhase':
-            assertNullByte()
-            unk2 = readLengthPrefixedString()  # TODO
-            property['value'] = {
-                'unk1': unk1,
-                'unk2': unk2
-            }
-        elif unk1 == 'None':
+        if unk1 == 'None':
             assertNullByte()
             property['value'] = {
                 'unk1': unk1,
                 'unk2': readByte()
             }
         else:
-            assertFail('unknown byte property ' + unk1)
-
+            assertNullByte()
+            unk2 = readLengthPrefixedString()  # TODO
+            property['value'] = {
+                'unk1': unk1,
+                'unk2': unk2
+            }
+        
     elif prop == 'TextProperty':
         assertNullByte()
         property['textUnknown'] = readHex(13)  # TODO
@@ -505,6 +504,9 @@ if args.output == None:
 else:
     output_file = args.output
 output = open(output_file, 'w')
-output.write(json.dumps(saveJson))
+if args.pretty == True:
+    output.write(json.dumps(saveJson, indent=4))
+else:
+    output.write(json.dumps(saveJson))
 output.close()
 print('converted savegame saved to ' + output_file)
