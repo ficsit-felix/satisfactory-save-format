@@ -59,7 +59,7 @@ def readFloat():
 def readLong():
     global bytesRead
     bytesRead += 8
-    return struct.unpack('l', f.read(8))[0]
+    return struct.unpack('q', f.read(8))[0]
 
 
 def readByte():

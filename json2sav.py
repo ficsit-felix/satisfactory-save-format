@@ -79,7 +79,7 @@ def writeFloat(value):
 
 
 def writeLong(value):
-    write(struct.pack('l', value))
+    write(struct.pack('q', value))
 
 
 def writeByte(value, count=True):
