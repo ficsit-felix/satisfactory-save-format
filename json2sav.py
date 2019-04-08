@@ -313,4 +313,11 @@ for obj in saveJson['objects']:
     elif obj['type'] == 0:
         writeEntity(False, obj['entity'])
 
+
+writeInt(len(saveJson['collected']))
+
+for collected in saveJson['collected']:
+    writeLengthPrefixedString(collected['levelName'])
+    writeLengthPrefixedString(collected['pathName'])
+
 writeHex(saveJson['missing'])
