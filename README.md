@@ -14,3 +14,14 @@ usage: json2sav.py [-h] [--output OUTPUT] FILE
 
 Converts from the more readable format back to a Satisfactory save game
 ```
+
+## Other useful repositories
+
+https://github.com/Vilsol/satisfactory-tool  
+Save file to json converter written in Go
+
+https://github.com/bitowl/ficsit-felix  
+Web app to visualize save files
+
+https://github.com/Goz3rr/SatisfactorySaveEditor  
+Save file editor for Windows written in C#
