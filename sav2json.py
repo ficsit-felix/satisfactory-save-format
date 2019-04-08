@@ -146,7 +146,8 @@ saveJson = {
     'playDurationSeconds': playDurationSeconds,
     'saveDateTime': saveDateTime,
     'sessionVisibility': sessionVisibility,
-    'objects': []
+    'objects': [],
+    'collected': []
 }
 
 
@@ -494,6 +495,13 @@ for i in range(0, elementCount):
     else:
         saveJson['objects'][i]['entity'] = readEntity(False, length)
 
+
+collectedCount = readInt()
+
+for i in range(0, collectedCount):
+    levelName = readLengthPrefixedString()
+    pathName = readLengthPrefixedString()
+    saveJson['collected'].append({'levelName': levelName, 'pathName': pathName})
 
 # store the remaining bytes as well so that we can recreate the exact same save file
 saveJson['missing'] = readHex(fileSize - f.tell())
