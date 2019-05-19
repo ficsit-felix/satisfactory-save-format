@@ -84,8 +84,27 @@ def readLengthPrefixedString():
     length = readInt()
     if length == 0:
         return ''
+    
+    if length < 0:
+        # Read UTF-16
+        length = length * -2
+        
+        chars = f.read(length-2)
 
+        zero = f.read(2)
+        bytesRead += length
+
+        if zero != b'\x00\x00':  # We assume that the last byte of a string is alway \x00\x00
+            if length > 100:
+                assertFail('zero is ' + str(zero) + ' in ' + str(chars[0:100]))
+            else:
+                assertFail('zero is ' + str(zero) + ' in ' + str(chars))
+        return chars.decode('utf-16')
+
+    # Read ASCII
+        
     chars = f.read(length-1)
+
     zero = f.read(1)
     bytesRead += length
 
@@ -95,7 +114,6 @@ def readLengthPrefixedString():
         else:
             assertFail('zero is ' + str(zero) + ' in ' + str(chars))
     return chars.decode('ascii')
-
 
 def readHex(count):
     """
@@ -226,15 +244,13 @@ def readProperty(properties):
 
     prop = readLengthPrefixedString()
     length = readInt()
-    zero = readInt()
-    if zero != 0:
-        print(name+ ' ' + prop)
-        assertFail('not null: ' + str(zero))
+    index = readInt()
 
     property = {
         'name': name,
         'type': prop,
-        '_length': length
+        '_length': length,
+        'index': index
     }
 
     if prop == 'IntProperty':
@@ -260,6 +276,7 @@ def readProperty(properties):
                 'y': y,
                 'z': z
             }
+                    
         elif type == 'Box':
             minX = readFloat()
             minY = readFloat()
@@ -356,6 +373,7 @@ def readProperty(properties):
             zero = readInt()
             if zero != 0:
                 assertFail('not zero: ' + str(zero))
+
             type = readLengthPrefixedString()
 
             property['structName'] = structName
@@ -375,8 +393,13 @@ def readProperty(properties):
         elif itemType == 'IntProperty':
             for i in range(0, count):
                 values.append(readInt())
+
+        elif itemType == 'ByteProperty':
+            for i in range(0, count):
+                values.append(readByte())
+
         else:
-            assertFail('unknown itemType ' + itemType)
+            assertFail('unknown itemType ' + itemType + ' in name ' + name)
 
         property['value'] = {
             'type': itemType,
