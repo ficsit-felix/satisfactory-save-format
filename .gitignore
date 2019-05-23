@@ -1,0 +1,8 @@
+*
+!*/
+
+!/.gitignore
+!/LICENSE
+!/README.md
+!/json2sav.py
+!/sav2json.py
