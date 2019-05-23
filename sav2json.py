@@ -363,6 +363,19 @@ def readProperty(properties):
             	'b': c,
             	'a': d
             }
+        elif type == 'RailroadTrackPosition':
+            levelName = readLengthPrefixedString()
+            pathName = readLengthPrefixedString()
+            offset = readFloat()
+            forward = readFloat()
+
+            property['value'] = {
+                'type': type,
+                'levelName': levelName,
+                'pathName': pathName,
+                'offset': offset,
+                'forward': forward
+            }
         elif type == 'TimerHandle':
             # no data
             property['value'] = {
