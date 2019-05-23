@@ -363,7 +363,13 @@ def readProperty(properties):
             	'b': c,
             	'a': d
             }
+        elif type == 'TimerHandle':
+            # no data
+            property['value'] = {
+                'type': type
+            }
         else:
+            print(property)
             assertFail('Unknown type: ' + type)
 
     elif prop == 'ArrayProperty':

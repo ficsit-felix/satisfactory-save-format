@@ -243,6 +243,8 @@ def writeProperty(property):
             writeHex(property['value']['g'])
             writeHex(property['value']['b'])
             writeHex(property['value']['a'])
+        elif type == 'TimerHandle':
+            pass # no data
 
     elif type == 'ArrayProperty':
         itemType = property['value']['type']
