@@ -238,6 +238,11 @@ def writeProperty(property):
             writeProperty(property['value']['properties'][0])
             # Dirty hack to make in this one case the inner property only take up 4 bytes
             buffers[len(buffers)-1]['length'] = oldval + 4
+        elif type == 'Color':
+            writeHex(property['value']['r'])
+            writeHex(property['value']['g'])
+            writeHex(property['value']['b'])
+            writeHex(property['value']['a'])
 
     elif type == 'ArrayProperty':
         itemType = property['value']['type']
