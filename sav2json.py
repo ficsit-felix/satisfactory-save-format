@@ -351,6 +351,18 @@ def readProperty(properties):
                 'pathName': pathName,
                 'properties': props
             }
+        elif type == 'Color':
+            a = readHex(1)
+            b = readHex(1)
+            c = readHex(1)
+            d = readHex(1)
+            property['value'] = {
+                'type': type,
+            	'r': a,
+            	'g': b,
+            	'b': c,
+            	'a': d
+            }
         else:
             assertFail('Unknown type: ' + type)
 
