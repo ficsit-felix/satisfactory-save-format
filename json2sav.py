@@ -156,7 +156,7 @@ def writeProperty(property):
     type = property['type']
     writeLengthPrefixedString(type)
     addBuffer()
-    writeInt(0, count=False)
+    writeInt(property['index'], count=False)
     if type == 'IntProperty':
         writeByte(0, count=False)
         writeInt(property['value'])
