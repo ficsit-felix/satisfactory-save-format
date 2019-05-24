@@ -85,15 +85,24 @@ def writeLong(value):
 def writeByte(value, count=True):
     write(struct.pack('b', value), count)
 
+# https://stackoverflow.com/a/18403812
+def isASCII(s):
+    return len(s) == len(s.encode())
 
 def writeLengthPrefixedString(value, count=True):
     if len(value) == 0:
         writeInt(0, count)
         return
-    writeInt(len(value)+1, count)
-    for i in value:
-        write(struct.pack('b', ord(i)), count)
-    write(b'\x00', count)
+
+    if isASCII(value):
+        writeInt(len(value)+1, count)
+        for i in value:
+            write(struct.pack('b', ord(i)), count)
+        write(b'\x00', count)
+    else:
+        writeInt(-len(value)-1, count)
+        write(value.encode('utf-16'), count)
+        write(b'\x00\x00', count)
 
 
 def writeHex(value, count=True):
