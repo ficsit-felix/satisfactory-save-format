@@ -259,6 +259,9 @@ def writeProperty(property):
         if itemType == 'IntProperty':
             for obj in property['value']['values']:
                 writeInt(obj)
+        elif itemType == 'ByteProperty':
+            for obj in property['value']['values']:
+                writeByte(obj)
         elif itemType == 'ObjectProperty':
             for obj in property['value']['values']:
                 writeLengthPrefixedString(obj['levelName'])
