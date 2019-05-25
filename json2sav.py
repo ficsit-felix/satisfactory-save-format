@@ -258,7 +258,7 @@ def writeProperty(property):
             writeFloat(property['value']['offset']);
             writeFloat(property['value']['forward']);
         elif type == 'TimerHandle':
-            pass # no data
+            writeLengthPrefixedString(property['value']['handle']);
 
     elif type == 'ArrayProperty':
         itemType = property['value']['type']

@@ -377,9 +377,9 @@ def readProperty(properties):
                 'forward': forward
             }
         elif type == 'TimerHandle':
-            # no data
             property['value'] = {
-                'type': type
+                'type': type,
+                'handle': readLengthPrefixedString()
             }
         else:
             print(property)
