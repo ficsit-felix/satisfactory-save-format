@@ -183,7 +183,10 @@ def writeProperty(property):
         writeLengthPrefixedString(property['value'])
     elif type == 'TextProperty':
         writeByte(0, count=False)
-        writeHex(property['textUnknown'])
+        writeInt(property['unknown1'])
+        writeByte(property['unknown2'])
+        writeInt(property['unknown3'])
+        writeLengthPrefixedString(property['unknown4'])
         writeLengthPrefixedString(property['value'])
     elif type == 'ByteProperty':  # TODO
 

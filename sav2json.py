@@ -498,7 +498,10 @@ def readProperty(properties):
         
     elif prop == 'TextProperty':
         assertNullByte()
-        property['textUnknown'] = readHex(13)  # TODO
+        property['unknown1'] = readInt()
+        property['unknown2'] = readByte()
+        property['unknown3'] = readInt()
+        property['unknown4'] = readLengthPrefixedString()
         property['value'] = readLengthPrefixedString()
     else:
         assertFail('Unknown property type: ' + prop)
