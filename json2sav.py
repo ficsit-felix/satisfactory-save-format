@@ -224,9 +224,9 @@ def writeProperty(property):
             writeFloat(property['value']['max'][2])
             writeByte(property['value']['isValid'])
         elif type == 'LinearColor':
-            writeFloat(property['value']['r'])
-            writeFloat(property['value']['g'])
             writeFloat(property['value']['b'])
+            writeFloat(property['value']['g'])
+            writeFloat(property['value']['r'])
             writeFloat(property['value']['a'])
         elif type == 'Transform':
             for prop in property['value']['properties']:

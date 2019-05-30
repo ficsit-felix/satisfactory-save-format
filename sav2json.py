@@ -292,15 +292,15 @@ def readProperty(properties):
                 'isValid': isValid
             }
         elif type == 'LinearColor':
-            r = readFloat()
-            g = readFloat()
             b = readFloat()
+            g = readFloat()
+            r = readFloat()
             a = readFloat()
             property['value'] = {
                 'type': type,
-                'r': r,
-                'g': g,
                 'b': b,
+                'g': g,
+                'r': r,
                 'a': a
             }
         elif type == 'Transform':
