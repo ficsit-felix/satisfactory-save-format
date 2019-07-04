@@ -8,6 +8,7 @@ import json
 import argparse
 import pathlib
 import sys
+import os
 
 parser = argparse.ArgumentParser(
     description='Converts from the more readable format back to a Satisfactory save game')
@@ -22,8 +23,25 @@ if extension == '.sav':
     print('error: extension of save file should be .json', file=sys.stderr)
     exit(1)
 
-f = open(args.file, 'r')
-saveJson = json.loads(f.read())
+def readJson(path):
+    f = open(path)
+    result = json.loads(f.read())
+    f.close()
+    return result
+
+
+if args.split == True:
+    saveJson = readJson(args.file + '/index.json')
+
+    # read all objects
+    saveJson['objects'] = []
+    objectFiles = os.listdir(args.file + '/objects')
+    objectFiles = sorted(objectFiles)
+    for filename in objectFiles:
+        saveJson['objects'].append(readJson(args.file + '/objects/' + filename))
+
+else:
+    saveJson = readJson(args.file)
 
 if args.output == None:
     output_file = pathlib.Path(args.file).stem + '.sav'

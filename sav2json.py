@@ -604,7 +604,7 @@ else:
  #   for i in range(0, len(saveJson['components'])):
  #       writeJsonToFile(output_dir + '/components/' + str(i) + '.json', saveJson['components'][i], args.pretty)
 
-    saveJson['objects'] = None
- #   saveJson['components'] = None
+    del saveJson['objects']
+ #   del saveJson['components']
 
     writeJsonToFile(output_dir + '/index.json', saveJson, args.pretty)
