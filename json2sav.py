@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('file', metavar='FILE', type=str,
                     help='json file to process')
 parser.add_argument('--output', '-o', type=str, help='output file (.sav)')
+parser.add_argument('--split', '-s', help='read a direction that contains the json file split into multiple files', action='store_true')
 args = parser.parse_args()
 
 extension = pathlib.Path(args.file).suffix

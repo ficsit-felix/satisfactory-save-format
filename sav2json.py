@@ -11,6 +11,7 @@ import sys
 import json
 import argparse
 import pathlib
+import os
 
 parser = argparse.ArgumentParser(
     description='Converts Satisfactory save games into a more readable format')
@@ -18,6 +19,7 @@ parser.add_argument('file', metavar='FILE', type=str,
                     help='save game to process (.sav file extension)')
 parser.add_argument('--output', '-o', type=str, help='output file (.json)')
 parser.add_argument('--pretty', '-p', help='pretty print json', action='store_true')
+parser.add_argument('--split', '-s', help='split the output json into multiple files and create a directory structure', action='store_true')
 
 args = parser.parse_args()
 
@@ -564,14 +566,45 @@ for i in range(0, collectedCount):
 saveJson['missing'] = readHex(fileSize - f.tell())
 
 
-if args.output == None:
-    output_file = pathlib.Path(args.file).stem + '.json'
+def writeJsonToFile(path, data, pretty):
+    output = open(path, 'w')
+    if pretty == True:
+        output.write(json.dumps(data, indent=4))
+    else:
+        output.write(json.dumps(data))
+    output.close()
+
+def mkdir(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+
+if args.split == False:
+    if args.output == None:
+        output_file = pathlib.Path(args.file).stem + '.json'
+    else:
+        output_file = args.output
+    writeJsonToFile(output_file, saveJson, args.pretty)
+    print('converted savegame saved to ' + output_file)
+
 else:
-    output_file = args.output
-output = open(output_file, 'w')
-if args.pretty == True:
-    output.write(json.dumps(saveJson, indent=4))
-else:
-    output.write(json.dumps(saveJson))
-output.close()
-print('converted savegame saved to ' + output_file)
+    # output to directory, split into multiple json files
+    if args.output == None:
+        output_dir = pathlib.Path(args.file).stem
+    else:
+        output_dir = args.output
+
+    mkdir(output_dir)
+    mkdir(output_dir + '/objects')
+#    mkdir(output_dir + '/components')
+
+    for i in range(0, len(saveJson['objects'])):
+        writeJsonToFile(output_dir + '/objects/' + str(i) + '.json', saveJson['objects'][i], args.pretty)
+
+ #   for i in range(0, len(saveJson['components'])):
+ #       writeJsonToFile(output_dir + '/components/' + str(i) + '.json', saveJson['components'][i], args.pretty)
+
+    saveJson['objects'] = None
+ #   saveJson['components'] = None
+
+    writeJsonToFile(output_dir + '/index.json', saveJson, args.pretty)
