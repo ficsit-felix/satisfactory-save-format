@@ -1,4 +1,12 @@
 # satisfactory-save-format
+
+
+---
+**IMPORTANT** 
+This repository is currently not maintained. It was mainly created to reverse engineer the save files and is not very performant. You can find a maintained version written in TypeScript at [satisfactory-json](https://github.com/ficsit-felix/satisfactory-json).
+
+---
+
 Repository containing the scripts I used to dissect the save files of Satisfactory.
 
 Contains two scripts to convert to a readable json format and back to a sav file.
